@@ -3,6 +3,7 @@
 import { unstable_cache, revalidateTag } from 'next/cache';
 import { db } from '@/lib/db';
 import { fileToBase64, uploadToImgBB } from '@/lib/imgbb';
+import { trackMetaPurchase } from '@/lib/meta-capi';
 import type { SiteContent } from '@/lib/types';
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
@@ -107,6 +108,18 @@ export async function placeStoreOrder(
       amount: Number(amount),
       notes: customer.notes || '',
     });
+
+    void trackMetaPurchase(
+      order.id,
+      Number(amount),
+      items.map((item) => ({
+        productId: item.productId,
+        name: item.name,
+        price: Number(item.price),
+        quantity: Number(item.quantity),
+      })),
+      { name: customer.name, phone: customer.phone }
+    );
 
     invalidateStoreCache();
 

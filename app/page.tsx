@@ -39,6 +39,11 @@ import {
 import Image from 'next/image';
 import Link from 'next/link';
 import { getStoreData, placeStoreOrder, submitContactAction, submitReviewAction } from './actions';
+import {
+  trackAddToCartMetaAction,
+  trackInitiateCheckoutMetaAction,
+  trackViewContentMetaAction,
+} from './meta-tracking';
 import { Category, Product, Review, SiteContent, GalleryItem, FaqItem } from '@/lib/types';
 import { ScrollReveal } from '@/components/scroll-reveal';
 import { ProductCard } from '@/components/product-card';
@@ -229,6 +234,38 @@ export default function StorefrontPage() {
     localStorage.setItem('khanfoods_cart', JSON.stringify(newCart));
   };
 
+  const metaProductPayload = (product: Product, quantity = 1) => {
+    const price = product.price * (1 - product.discount / 100);
+    return {
+      productId: product.id,
+      name: product.nameBn || product.name,
+      price,
+      quantity,
+      category: product.category,
+    };
+  };
+
+  const metaCartPayload = (items: CartItem[]) => ({
+    items: items.map((item) => metaProductPayload(item.product, item.quantity)),
+    value: items.reduce((sum, item) => {
+      const price = item.product.price * (1 - item.product.discount / 100);
+      return sum + price * item.quantity;
+    }, 0),
+  });
+
+  const openCheckout = () => {
+    if (cart.length > 0) {
+      void trackInitiateCheckoutMetaAction(metaCartPayload(cart));
+    }
+    setShowCart(false);
+    setShowCheckout(true);
+  };
+
+  const openProductDetails = (product: Product) => {
+    void trackViewContentMetaAction(metaProductPayload(product));
+    setQuickViewProduct(product);
+  };
+
   // Cart operations
   const addToCart = (product: Product, quantity: number = 1) => {
     const existingIndex = cart.findIndex((item) => item.product.id === product.id);
@@ -250,7 +287,8 @@ export default function StorefrontPage() {
     }
 
     saveCartToLocalStorage(newCart);
-        showToast(`${product.name} কার্টে যুক্ত হয়েছে!`, 'success');
+    showToast(`${product.name} কার্টে যুক্ত হয়েছে!`, 'success');
+    void trackAddToCartMetaAction(metaProductPayload(product, quantity));
     setShowCart(true); // Open cart drawer
   };
 
@@ -597,7 +635,7 @@ export default function StorefrontPage() {
                       index={idx}
                       categoryLabel={catMatch?.nameBn || catMatch?.name || p.category}
                       onAddToCart={() => addToCart(p, 1)}
-                      onImageClick={() => setQuickViewProduct(p)}
+                      onImageClick={() => openProductDetails(p)}
                     />
                   );
                 })}
@@ -1054,19 +1092,19 @@ export default function StorefrontPage() {
 
                               {/* Quantity actions */}
                               <div className="flex items-center justify-between pt-2">
-                                <div className="flex items-center gap-2 border bg-white rounded-lg p-0.5">
+                                <div className="flex items-center gap-2 border border-stone-200 dark:border-white/20 bg-white dark:bg-white/10 rounded-lg p-0.5">
                                   <button
                                     onClick={() => updateCartQuantity(item.product.id, -1)}
-                                    className="p-1 hover:bg-[var(--kf-primary-light)] hover:text-[var(--kf-primary)] rounded text-stone-600 transition"
+                                    className="p-1 hover:bg-[var(--kf-primary-light)] hover:text-[var(--kf-primary)] rounded text-stone-600 dark:text-white transition"
                                   >
                                     <Minus className="w-3.5 h-3.5" />
                                   </button>
-                                  <span className="text-xs font-black w-6 text-center text-stone-800">
+                                  <span className="text-xs font-black w-6 text-center text-stone-800 dark:text-white">
                                     {item.quantity}
                                   </span>
                                   <button
                                     onClick={() => updateCartQuantity(item.product.id, 1)}
-                                    className="p-1 hover:bg-[var(--kf-primary-light)] hover:text-[var(--kf-primary)] rounded text-stone-600 transition"
+                                    className="p-1 hover:bg-[var(--kf-primary-light)] hover:text-[var(--kf-primary)] rounded text-stone-600 dark:text-white transition"
                                   >
                                     <Plus className="w-3.5 h-3.5" />
                                   </button>
@@ -1134,10 +1172,7 @@ export default function StorefrontPage() {
                       <Button
                         size="md"
                         fullWidth
-                        onClick={() => {
-                          setShowCart(false);
-                          setShowCheckout(true);
-                        }}
+                        onClick={openCheckout}
                       >
                         {t.checkout}
                       </Button>
