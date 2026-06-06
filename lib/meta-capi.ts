@@ -90,7 +90,7 @@ export async function sendMetaServerEvent(
     customer?: MetaCustomerData;
   }
 ): Promise<{ ok: boolean; error?: string }> {
-  const pixelId = process.env.META_PIXEL_ID || process.env.META_DATASET_ID;
+  const pixelId = process.env.META_DATASET_ID || process.env.META_PIXEL_ID;
   const accessToken = process.env.META_ACCESS_TOKEN;
 
   if (!pixelId || !accessToken) {
@@ -100,19 +100,32 @@ export async function sendMetaServerEvent(
   const { clientIp, userAgent, sourceUrl } = await getRequestContext();
   const hashedUser = buildHashedUserData(options.customer);
 
+  const userData: Record<string, string | string[]> = {
+    ...hashedUser,
+    ...(clientIp ? { client_ip_address: clientIp } : {}),
+    ...(userAgent ? { client_user_agent: userAgent } : {}),
+  };
+
+  if (!clientIp && !userAgent && Object.keys(hashedUser).length === 0) {
+    console.warn('[Meta CAPI]', eventName, 'skipped — no user_data (IP/UA required by Meta)');
+    return { ok: false, error: 'Missing user_data for Meta CAPI' };
+  }
+
   const eventPayload: Record<string, unknown> = {
     event_name: eventName,
     event_time: Math.floor(Date.now() / 1000),
     action_source: 'website',
     event_id: options.eventId || `${eventName}_${Date.now()}_${crypto.randomUUID()}`,
     custom_data: buildCustomData(options.items, options.value),
-    user_data: {
-      ...hashedUser,
-      ...(clientIp ? { client_ip_address: clientIp } : {}),
-      ...(userAgent ? { client_user_agent: userAgent } : {}),
-    },
+    user_data: userData,
     ...(sourceUrl ? { event_source_url: sourceUrl } : {}),
   };
+
+  const testEventCode = process.env.META_TEST_EVENT_CODE;
+  const requestBody: Record<string, unknown> = { data: [eventPayload] };
+  if (testEventCode) {
+    requestBody.test_event_code = testEventCode;
+  }
 
   try {
     const url = `https://graph.facebook.com/${META_API_VERSION}/${pixelId}/events?access_token=${encodeURIComponent(accessToken)}`;
@@ -120,7 +133,7 @@ export async function sendMetaServerEvent(
     const response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ data: [eventPayload] }),
+      body: JSON.stringify(requestBody),
     });
 
     const result = (await response.json()) as { events_received?: number; error?: { message?: string } };
