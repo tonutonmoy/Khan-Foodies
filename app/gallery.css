@@ -1,0 +1,18 @@
+/* Marquee image gallery */
+
+@keyframes gallery-marquee-scroll {
+  0% {
+    transform: translateX(0%);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.gallery-marquee-inner {
+  animation: gallery-marquee-scroll linear infinite;
+}
+
+.gallery-marquee-inner.is-paused {
+  animation-play-state: paused;
+}

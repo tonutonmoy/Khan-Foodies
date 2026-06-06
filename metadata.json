@@ -1,0 +1,6 @@
+{
+  "name": "Khan Foods",
+  "description": "Khan Foods - Premium Full-Stack E-Commerce Platform for luxury organic foods, premium honey, nuts, and organic delicacies.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

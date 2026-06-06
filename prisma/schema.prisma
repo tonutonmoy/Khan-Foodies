@@ -1,0 +1,151 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+model Category {
+  id     String  @id @map("_id")
+  name   String
+  nameBn String?
+  icon   String
+  slug   String
+
+  @@map("categories")
+}
+
+model Product {
+  id            String  @id @map("_id")
+  name          String
+  nameBn        String?
+  price         Float
+  discount      Float   @default(0)
+  description   String
+  descriptionBn String?
+  category      String
+  stock         Int     @default(0)
+  status        String  @default("Active")
+  rating        Float   @default(4.8)
+  image         String
+
+  @@index([status])
+  @@index([category])
+  @@map("products")
+}
+
+model Order {
+  id           String      @id @default(cuid()) @map("_id")
+  orderNumber  String      @unique
+  customerName String
+  phone        String
+  address      String
+  items        OrderItem[]
+  amount       Float
+  status       String      @default("Pending")
+  notes        String?
+  createdAt    DateTime    @default(now())
+
+  @@index([status])
+  @@index([createdAt])
+  @@map("orders")
+}
+
+type OrderItem {
+  productId String
+  name      String
+  price     Float
+  quantity  Int
+}
+
+model Review {
+  id     String  @id @default(cuid()) @map("_id")
+  name   String
+  rating Int
+  text   String
+  image  String
+  role   String?
+  roleBn String?
+
+  @@map("reviews")
+}
+
+model GalleryItem {
+  id            String @id @default(cuid()) @map("_id")
+  title         String
+  titleBn       String?
+  description   String
+  descriptionBn String?
+  image         String
+  slot          Int    @default(1)
+  sortOrder     Int    @default(0)
+
+  @@map("gallery_items")
+}
+
+model FaqItem {
+  id         String  @id @default(cuid()) @map("_id")
+  question   String
+  questionBn String?
+  answer     String
+  answerBn   String?
+  sortOrder  Int     @default(0)
+
+  @@map("faq_items")
+}
+
+model SiteContent {
+  id String @id @default("main") @map("_id")
+
+  heroHeadline       String
+  heroHeadlineBn     String
+  heroSubheadline    String
+  heroSubheadlineBn  String
+  aboutTitle         String
+  aboutTitleBn       String
+  aboutText          String
+  aboutTextBn        String
+  aboutImage         String
+
+  bannerImage1     String
+  bannerTagline1   String
+  bannerTagline1Bn String
+  bannerTitle1     String
+  bannerTitle1Bn   String
+
+  bannerImage2     String
+  bannerTagline2   String
+  bannerTagline2Bn String
+  bannerTitle2     String
+  bannerTitle2Bn   String
+
+  bannerImage3     String
+  bannerTagline3   String
+  bannerTagline3Bn String
+  bannerTitle3     String
+  bannerTitle3Bn   String
+
+  contactEmail      String
+  contactPhone      String
+  contactAddress    String
+  contactAddressBn  String
+  facebookUrl       String
+  youtubeUrl        String
+  instagramUrl      String
+  footerText        String
+  footerTextBn      String
+
+  @@map("site_content")
+}
+
+model ContactMessage {
+  id        String   @id @default(cuid()) @map("_id")
+  name      String
+  email     String
+  message   String
+  createdAt DateTime @default(now())
+
+  @@map("contact_messages")
+}
