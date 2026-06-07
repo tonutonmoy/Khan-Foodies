@@ -34,7 +34,12 @@ const getCachedStoreData = unstable_cache(
 
 export async function getStoreData() {
   try {
-    const data = await getCachedStoreData();
+    const data = await Promise.race([
+      getCachedStoreData(),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('Database timeout — please refresh')), 15000)
+      ),
+    ]);
     return { success: true, ...data };
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Failed to fetch store data';
