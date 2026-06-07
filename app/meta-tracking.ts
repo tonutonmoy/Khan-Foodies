@@ -4,6 +4,7 @@ import {
   trackMetaAddToCart,
   trackMetaInitiateCheckout,
   trackMetaViewContent,
+  type MetaBrowserContext,
 } from '@/lib/meta-capi';
 
 type TrackProductPayload = {
@@ -12,14 +13,18 @@ type TrackProductPayload = {
   price: number;
   quantity: number;
   category?: string;
+  eventId?: string;
+  browser?: MetaBrowserContext;
 };
 
 type TrackCartPayload = {
   items: TrackProductPayload[];
   value: number;
+  eventId?: string;
+  browser?: MetaBrowserContext;
 };
 
-/** Server-side only — no browser pixel. Called from client via server action. */
+/** Server-side CAPI — paired with browser pixel via shared eventId. */
 export async function trackAddToCartMetaAction(payload: TrackProductPayload) {
   return trackMetaAddToCart(
     [
@@ -31,7 +36,8 @@ export async function trackAddToCartMetaAction(payload: TrackProductPayload) {
         category: payload.category,
       },
     ],
-    payload.price * payload.quantity
+    payload.price * payload.quantity,
+    { eventId: payload.eventId, browser: payload.browser }
   );
 }
 
@@ -44,7 +50,8 @@ export async function trackInitiateCheckoutMetaAction(payload: TrackCartPayload)
       quantity: item.quantity,
       category: item.category,
     })),
-    payload.value
+    payload.value,
+    { eventId: payload.eventId, browser: payload.browser }
   );
 }
 
@@ -59,6 +66,7 @@ export async function trackViewContentMetaAction(payload: TrackProductPayload) {
         category: payload.category,
       },
     ],
-    payload.price
+    payload.price,
+    { eventId: payload.eventId, browser: payload.browser }
   );
 }

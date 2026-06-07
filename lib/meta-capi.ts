@@ -17,6 +17,18 @@ export type MetaCustomerData = {
   email?: string;
 };
 
+export type MetaBrowserContext = {
+  fbp?: string;
+  fbc?: string;
+  eventSourceUrl?: string;
+};
+
+export type MetaRequestContext = {
+  clientIp?: string;
+  userAgent?: string;
+  sourceUrl?: string;
+};
+
 function sha256(value: string): string {
   return crypto.createHash('sha256').update(value).digest('hex');
 }
@@ -45,7 +57,15 @@ function buildHashedUserData(customer?: MetaCustomerData) {
   return userData;
 }
 
-async function getRequestContext() {
+async function getRequestContext(override?: MetaRequestContext) {
+  if (override) {
+    return {
+      clientIp: override.clientIp,
+      userAgent: override.userAgent,
+      sourceUrl: override.sourceUrl || process.env.NEXT_PUBLIC_APP_URL || undefined,
+    };
+  }
+
   try {
     const h = await headers();
     return {
@@ -81,6 +101,13 @@ function buildCustomData(items: MetaProductItem[], value: number) {
   };
 }
 
+function hasSufficientUserData(userData: Record<string, string | string[]>): boolean {
+  if (userData.client_ip_address || userData.client_user_agent) return true;
+  if (userData.fbp || userData.fbc) return true;
+  const hashedKeys = ['em', 'ph', 'fn', 'ln', 'ct', 'st', 'zp', 'country'];
+  return hashedKeys.some((key) => userData[key]);
+}
+
 export async function sendMetaServerEvent(
   eventName: string,
   options: {
@@ -88,6 +115,8 @@ export async function sendMetaServerEvent(
     value: number;
     eventId?: string;
     customer?: MetaCustomerData;
+    browser?: MetaBrowserContext;
+    requestContext?: MetaRequestContext;
   }
 ): Promise<{ ok: boolean; error?: string }> {
   const pixelId = process.env.META_DATASET_ID || process.env.META_PIXEL_ID;
@@ -97,19 +126,23 @@ export async function sendMetaServerEvent(
     return { ok: false, error: 'Meta CAPI not configured' };
   }
 
-  const { clientIp, userAgent, sourceUrl } = await getRequestContext();
+  const { clientIp, userAgent, sourceUrl } = await getRequestContext(options.requestContext);
   const hashedUser = buildHashedUserData(options.customer);
 
   const userData: Record<string, string | string[]> = {
     ...hashedUser,
     ...(clientIp ? { client_ip_address: clientIp } : {}),
     ...(userAgent ? { client_user_agent: userAgent } : {}),
+    ...(options.browser?.fbp ? { fbp: options.browser.fbp } : {}),
+    ...(options.browser?.fbc ? { fbc: options.browser.fbc } : {}),
   };
 
-  if (!clientIp && !userAgent && Object.keys(hashedUser).length === 0) {
-    console.warn('[Meta CAPI]', eventName, 'skipped — no user_data (IP/UA required by Meta)');
+  if (!hasSufficientUserData(userData)) {
+    console.warn('[Meta CAPI]', eventName, 'skipped — insufficient user_data for Meta matching');
     return { ok: false, error: 'Missing user_data for Meta CAPI' };
   }
+
+  const eventSourceUrl = options.browser?.eventSourceUrl || sourceUrl;
 
   const eventPayload: Record<string, unknown> = {
     event_name: eventName,
@@ -118,7 +151,7 @@ export async function sendMetaServerEvent(
     event_id: options.eventId || `${eventName}_${Date.now()}_${crypto.randomUUID()}`,
     custom_data: buildCustomData(options.items, options.value),
     user_data: userData,
-    ...(sourceUrl ? { event_source_url: sourceUrl } : {}),
+    ...(eventSourceUrl ? { event_source_url: eventSourceUrl } : {}),
   };
 
   const testEventCode = process.env.META_TEST_EVENT_CODE;
@@ -156,24 +189,38 @@ export async function trackMetaPurchase(
   orderId: string,
   amount: number,
   items: MetaProductItem[],
-  customer: MetaCustomerData
+  customer: MetaCustomerData,
+  options?: { eventId?: string; browser?: MetaBrowserContext }
 ) {
   return sendMetaServerEvent('Purchase', {
     items,
     value: amount,
-    eventId: `purchase_${orderId}`,
+    eventId: options?.eventId || `purchase_${orderId}`,
     customer,
+    browser: options?.browser,
   });
 }
 
-export async function trackMetaAddToCart(items: MetaProductItem[], value: number) {
-  return sendMetaServerEvent('AddToCart', { items, value });
+export async function trackMetaAddToCart(
+  items: MetaProductItem[],
+  value: number,
+  options?: { eventId?: string; browser?: MetaBrowserContext }
+) {
+  return sendMetaServerEvent('AddToCart', { items, value, ...options });
 }
 
-export async function trackMetaInitiateCheckout(items: MetaProductItem[], value: number) {
-  return sendMetaServerEvent('InitiateCheckout', { items, value });
+export async function trackMetaInitiateCheckout(
+  items: MetaProductItem[],
+  value: number,
+  options?: { eventId?: string; browser?: MetaBrowserContext }
+) {
+  return sendMetaServerEvent('InitiateCheckout', { items, value, ...options });
 }
 
-export async function trackMetaViewContent(items: MetaProductItem[], value: number) {
-  return sendMetaServerEvent('ViewContent', { items, value });
+export async function trackMetaViewContent(
+  items: MetaProductItem[],
+  value: number,
+  options?: { eventId?: string; browser?: MetaBrowserContext }
+) {
+  return sendMetaServerEvent('ViewContent', { items, value, ...options });
 }

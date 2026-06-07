@@ -44,6 +44,12 @@ import {
   trackInitiateCheckoutMetaAction,
   trackViewContentMetaAction,
 } from './meta-tracking';
+import {
+  buildMetaCustomData,
+  generateMetaEventId,
+  getMetaBrowserContext,
+  trackMetaBrowserEvent,
+} from '@/lib/meta-events';
 import { Category, Product, Review, SiteContent, GalleryItem, FaqItem } from '@/lib/types';
 import { ScrollReveal } from '@/components/scroll-reveal';
 import { ProductCard } from '@/components/product-card';
@@ -255,14 +261,28 @@ export default function StorefrontPage() {
 
   const openCheckout = () => {
     if (cart.length > 0) {
-      void trackInitiateCheckoutMetaAction(metaCartPayload(cart));
+      const payload = metaCartPayload(cart);
+      const eventId = generateMetaEventId('InitiateCheckout');
+      const browser = getMetaBrowserContext();
+      trackMetaBrowserEvent('InitiateCheckout', buildMetaCustomData(
+        payload.items.map((i) => ({ productId: i.productId, price: i.price, quantity: i.quantity })),
+        payload.value
+      ), eventId);
+      void trackInitiateCheckoutMetaAction({ ...payload, eventId, browser });
     }
     setShowCart(false);
     setShowCheckout(true);
   };
 
   const openProductDetails = (product: Product) => {
-    void trackViewContentMetaAction(metaProductPayload(product));
+    const payload = metaProductPayload(product);
+    const eventId = generateMetaEventId('ViewContent');
+    const browser = getMetaBrowserContext();
+    trackMetaBrowserEvent('ViewContent', buildMetaCustomData(
+      [{ productId: payload.productId, price: payload.price, quantity: 1 }],
+      payload.price
+    ), eventId);
+    void trackViewContentMetaAction({ ...payload, eventId, browser });
     setQuickViewProduct(product);
   };
 
@@ -288,7 +308,14 @@ export default function StorefrontPage() {
 
     saveCartToLocalStorage(newCart);
     showToast(`${product.name} কার্টে যুক্ত হয়েছে!`, 'success');
-    void trackAddToCartMetaAction(metaProductPayload(product, quantity));
+    const payload = metaProductPayload(product, quantity);
+    const eventId = generateMetaEventId('AddToCart');
+    const browser = getMetaBrowserContext();
+    trackMetaBrowserEvent('AddToCart', buildMetaCustomData(
+      [{ productId: payload.productId, price: payload.price, quantity: payload.quantity }],
+      payload.price * payload.quantity
+    ), eventId);
+    void trackAddToCartMetaAction({ ...payload, eventId, browser });
     setShowCart(true); // Open cart drawer
   };
 
@@ -369,10 +396,18 @@ export default function StorefrontPage() {
     }));
 
     startTransition(async () => {
+      const browser = getMetaBrowserContext();
+      const purchaseEventId = generateMetaEventId('Purchase');
+      trackMetaBrowserEvent('Purchase', buildMetaCustomData(
+        orderItems.map((i) => ({ productId: i.productId, price: i.price, quantity: i.quantity })),
+        total
+      ), purchaseEventId);
+
       const res = await placeStoreOrder(
         { ...checkoutForm, notes: combinedNotes },
         orderItems,
-        total
+        total,
+        { eventId: purchaseEventId, browser }
       );
       if (res.success) {
         setOrderSuccess(res.order);

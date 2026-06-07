@@ -4,6 +4,7 @@ import './globals.css';
 import './product-cards.css';
 import './gallery.css';
 import { JsonLd } from '@/components/json-ld';
+import { MetaPixel } from '@/components/meta-pixel';
 import { Providers } from './providers';
 
 const themeScript = `(function(){try{var t=localStorage.getItem('khanfoods-theme');var d=t==='dark'||(!t&&window.matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.classList.toggle('dark',d);}catch(e){}})();`;
@@ -104,6 +105,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body className="font-sans antialiased" suppressHydrationWarning>
         <JsonLd />
+        <MetaPixel />
         <Providers>{children}</Providers>
       </body>
     </html>

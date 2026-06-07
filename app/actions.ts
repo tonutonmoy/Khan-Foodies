@@ -3,7 +3,7 @@
 import { unstable_cache, revalidateTag } from 'next/cache';
 import { db } from '@/lib/db';
 import { fileToBase64, uploadToImgBB } from '@/lib/imgbb';
-import { trackMetaPurchase } from '@/lib/meta-capi';
+import { trackMetaPurchase, type MetaBrowserContext } from '@/lib/meta-capi';
 import type { SiteContent } from '@/lib/types';
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
@@ -88,7 +88,8 @@ function invalidateStoreCache() {
 export async function placeStoreOrder(
   customer: { name: string; phone: string; address: string; notes?: string },
   items: Array<{ productId: string; name: string; price: number; quantity: number }>,
-  amount: number
+  amount: number,
+  meta?: { eventId?: string; browser?: MetaBrowserContext }
 ) {
   try {
     if (!customer.name || !customer.phone || !customer.address || items.length === 0) {
@@ -118,7 +119,8 @@ export async function placeStoreOrder(
         price: Number(item.price),
         quantity: Number(item.quantity),
       })),
-      { name: customer.name, phone: customer.phone }
+      { name: customer.name, phone: customer.phone },
+      { eventId: meta?.eventId, browser: meta?.browser }
     );
 
     invalidateStoreCache();
@@ -259,6 +261,40 @@ export async function submitContactAction(contact: { name: string; email: string
     };
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Failed to submit';
+    return { success: false, error: message };
+  }
+}
+
+export async function getContactMessagesAction(password: string) {
+  if (password !== ADMIN_PASSWORD) {
+    return { success: false, error: 'Unauthorized' };
+  }
+
+  try {
+    const messages = await db.getContactMessages();
+    return {
+      success: true,
+      messages: messages.map((m) => ({
+        ...m,
+        createdAt: m.createdAt.toISOString(),
+      })),
+    };
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Failed to fetch messages';
+    return { success: false, error: message };
+  }
+}
+
+export async function deleteContactMessageAction(password: string, id: string) {
+  if (password !== ADMIN_PASSWORD) {
+    return { success: false, error: 'Unauthorized' };
+  }
+
+  try {
+    const success = await db.deleteContactMessage(id);
+    return { success };
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Failed to delete message';
     return { success: false, error: message };
   }
 }

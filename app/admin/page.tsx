@@ -28,6 +28,7 @@ import {
   Icon,
   Images,
   CircleHelp,
+  MessageSquare,
 } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -47,9 +48,12 @@ import {
   deleteGalleryItemAction,
   saveFaqItemAction,
   deleteFaqItemAction,
+  getContactMessagesAction,
+  deleteContactMessageAction,
 } from '../actions';
 import { Category, Product, Order, Review, SiteContent, GalleryItem, FaqItem } from '@/lib/types';
 import { AdminOrderNotification } from '@/components/admin-order-notification';
+import { compressImageForUpload } from '@/lib/compress-image';
 
 export default function AdminDashboardPage() {
   const [password, setPassword] = useState('');
@@ -66,12 +70,19 @@ export default function AdminDashboardPage() {
 
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<
-    'overview' | 'products' | 'categories' | 'orders' | 'content' | 'reviews' | 'gallery' | 'faq'
+    'overview' | 'products' | 'categories' | 'orders' | 'content' | 'reviews' | 'gallery' | 'faq' | 'messages'
   >('overview');
   
   // Transition support
   const [isPending, startTransition] = useTransition();
-  const [uploadingImage, setUploadingImage] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState<string | null>(null);
+  const [contactMessages, setContactMessages] = useState<Array<{
+    id: string;
+    name: string;
+    email: string;
+    message: string;
+    createdAt: string;
+  }>>([]);
 
   // Dialog states for Product
   const [showProductDialog, setShowProductDialog] = useState(false);
@@ -98,16 +109,17 @@ export default function AdminDashboardPage() {
     }, 3500);
   };
 
-  const handleImageUpload = async (file: File, applyUrl: (url: string) => void) => {
+  const handleImageUpload = async (file: File, applyUrl: (url: string) => void, fieldKey = 'default') => {
     if (!password) {
       showToast('Please login first', 'error');
       return;
     }
 
-    setUploadingImage(true);
+    setUploadingImage(fieldKey);
     try {
+      const compressed = await compressImageForUpload(file);
       const formData = new FormData();
-      formData.append('image', file);
+      formData.append('image', compressed);
       const res = await uploadImageAction(password, formData);
 
       if (res.success && res.url) {
@@ -119,11 +131,18 @@ export default function AdminDashboardPage() {
     } catch {
       showToast('ImgBB upload failed', 'error');
     } finally {
-      setUploadingImage(false);
+      setUploadingImage(null);
     }
   };
 
   // Re-fetch admin data
+  const refreshContactMessages = async (pwd: string) => {
+    const res = await getContactMessagesAction(pwd);
+    if (res.success && res.messages) {
+      setContactMessages(res.messages);
+    }
+  };
+
   const refreshAdminData = async (pwd: string) => {
     setLoading(true);
     const res = await getAdminData(pwd);
@@ -138,8 +157,8 @@ export default function AdminDashboardPage() {
         faqItems: res.faqItems || [],
       });
       setIsLoggedIn(true);
-      // Cache pass
       localStorage.setItem('khanfoods_admin_key', pwd);
+      void refreshContactMessages(pwd);
     } else {
       showToast(res.error || 'Access Denied', 'error');
       localStorage.removeItem('khanfoods_admin_key');
@@ -547,6 +566,20 @@ export default function AdminDashboardPage() {
             </button>
 
             <button
+              onClick={() => setActiveTab('messages')}
+              className={`w-full flex items-center gap-2.5 px-4 py-3 rounded-lg text-sm font-bold transition text-left cursor-pointer ${
+                activeTab === 'messages' ? 'bg-[#1a234d] text-white' : 'text-stone-400 hover:bg-stone-800 hover:text-white'
+              }`}
+            >
+              <MessageSquare className="w-4 h-4" /> Contact Messages
+              {contactMessages.length > 0 && (
+                <span className="ml-auto bg-[#f5b075] text-[#1a234d] text-[10px] font-black px-1.5 py-0.5 rounded-full">
+                  {contactMessages.length}
+                </span>
+              )}
+            </button>
+
+            <button
               onClick={() => setActiveTab('reviews')}
               className={`w-full flex items-center gap-2.5 px-4 py-3 rounded-lg text-sm font-bold transition text-left cursor-pointer ${
                 activeTab === 'reviews' ? 'bg-[#1a234d] text-white' : 'text-stone-400 hover:bg-stone-800 hover:text-white'
@@ -586,6 +619,7 @@ export default function AdminDashboardPage() {
               {activeTab === 'content' && 'Live Front-page Web Controls'}
               {activeTab === 'gallery' && 'Gallery Image Manager'}
               {activeTab === 'faq' && 'FAQ Content Manager'}
+              {activeTab === 'messages' && 'Contact Inbox'}
               {activeTab === 'reviews' && 'Customer Review Moderation'}
             </h1>
           </div>
@@ -1820,6 +1854,61 @@ export default function AdminDashboardPage() {
                 </div>
               ))}
             </div>
+          </div>
+        )}
+
+        {/* CONTACT MESSAGES TAB */}
+        {activeTab === 'messages' && adminData && (
+          <div className="space-y-6">
+            <div className="mb-6">
+              <h3 className="font-serif text-3xl font-black text-stone-900">Contact Inbox</h3>
+              <p className="text-xs text-stone-400 font-bold uppercase tracking-widest mt-1">
+                Messages from the website contact form
+              </p>
+            </div>
+
+            {contactMessages.length === 0 ? (
+              <div className="bg-white rounded-3xl border border-stone-100 p-12 text-center text-stone-400 font-bold">
+                No contact messages yet.
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {contactMessages.map((msg) => (
+                  <div key={msg.id} className="bg-white rounded-2xl border border-stone-100 p-6 shadow-sm">
+                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-4">
+                      <div>
+                        <h4 className="font-bold text-stone-900">{msg.name}</h4>
+                        <a href={`mailto:${msg.email}`} className="text-sm text-[#1a234d] hover:underline">
+                          {msg.email}
+                        </a>
+                        <p className="text-xs text-stone-400 mt-1">
+                          {new Date(msg.createdAt).toLocaleString('en-BD', { dateStyle: 'medium', timeStyle: 'short' })}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!password) return;
+                          startTransition(async () => {
+                            const res = await deleteContactMessageAction(password, msg.id);
+                            if (res.success) {
+                              showToast('Message deleted', 'success');
+                              void refreshContactMessages(password);
+                            } else {
+                              showToast(res.error || 'Delete failed', 'error');
+                            }
+                          });
+                        }}
+                        className="text-xs font-bold text-red-500 hover:text-red-700 cursor-pointer"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                    <p className="text-sm text-stone-700 whitespace-pre-wrap leading-relaxed">{msg.message}</p>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 

@@ -340,6 +340,21 @@ export const db = {
     await prisma.contactMessage.create({ data: contact });
   },
 
+  getContactMessages: async (): Promise<
+    Array<{ id: string; name: string; email: string; message: string; createdAt: Date }>
+  > => {
+    return prisma.contactMessage.findMany({ orderBy: { createdAt: 'desc' } });
+  },
+
+  deleteContactMessage: async (id: string): Promise<boolean> => {
+    try {
+      await prisma.contactMessage.delete({ where: { id } });
+      return true;
+    } catch {
+      return false;
+    }
+  },
+
   testConnection: async (): Promise<boolean> => {
     await prisma.$runCommandRaw({ ping: 1 });
     return true;
