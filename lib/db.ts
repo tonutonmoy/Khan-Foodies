@@ -323,7 +323,7 @@ export const db = {
   },
 
   updateSiteContent: async (content: SiteContent): Promise<SiteContent> => {
-    const { ...data } = content;
+    const { id: _id, ...data } = content;
     const updated = await prisma.siteContent.upsert({
       where: { id: 'main' },
       create: { id: 'main', ...data },
