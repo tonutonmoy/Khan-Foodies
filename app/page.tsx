@@ -63,6 +63,7 @@ import { Navbar } from '@/components/navbar';
 import { PromoBanner } from '@/components/promo-banner';
 import { AboutSection } from '@/components/about-section';
 import { t } from '@/lib/i18n-bn';
+import { compressImageForUpload } from '@/lib/compress-image';
 
 // Helper for Lucide Categories icon rendering
 const getCategoryIcon = (iconName: string) => {
@@ -184,7 +185,9 @@ export default function StorefrontPage() {
   const [reviewForm, setReviewForm] = useState({
     name: '',
     rating: 5,
-    text: ''
+    text: '',
+    imageFile: null as File | null,
+    imagePreview: '' as string,
   });
 
   // UI state for Toast
@@ -446,11 +449,23 @@ export default function StorefrontPage() {
       return;
     }
 
-    const res = await submitReviewAction(reviewForm);
+    const formData = new FormData();
+    formData.append('name', reviewForm.name);
+    formData.append('rating', String(reviewForm.rating));
+    formData.append('text', reviewForm.text);
+    if (siteContent?.defaultReviewAvatar) {
+      formData.append('defaultAvatar', siteContent.defaultReviewAvatar);
+    }
+    if (reviewForm.imageFile) {
+      formData.append('image', reviewForm.imageFile);
+    }
+
+    const res = await submitReviewAction(formData);
     if (res.success && res.review) {
       setReviews((prev) => [res.review!, ...prev]);
       showToast('ধন্যবাদ! আপনার রিভিউ প্রকাশিত হয়েছে।', 'success');
-      setReviewForm({ name: '', rating: 5, text: '' });
+      if (reviewForm.imagePreview) URL.revokeObjectURL(reviewForm.imagePreview);
+      setReviewForm({ name: '', rating: 5, text: '', imageFile: null, imagePreview: '' });
     } else {
       showToast(res.error || 'Review save failed.', 'error');
     }
@@ -485,11 +500,11 @@ export default function StorefrontPage() {
         tagline: s.taglineBn,
       }));
 
-  const heroImages = [
-    ...galleryItems.map((g) => g.image),
-    ...bannerSlides.map((b) => b.image),
-    ...products.slice(0, 4).map((p) => p.image),
-  ].slice(0, 4);
+  const heroImages = siteContent
+    ? [siteContent.heroImage1, siteContent.heroImage2, siteContent.heroImage3, siteContent.heroImage4].filter(
+        (url): url is string => Boolean(url)
+      )
+    : [];
 
   return (
     <div className="min-h-screen flex flex-col relative">
@@ -774,6 +789,48 @@ export default function StorefrontPage() {
                   />
                 </div>
 
+                <div>
+                  <label className="block text-[9px] uppercase font-bold tracking-widest text-slate-400 mb-1">
+                    {t.reviewPhotoLabel}
+                  </label>
+                  <div className="flex items-center gap-4">
+                    <div className="relative w-14 h-14 rounded-full overflow-hidden bg-slate-100 border border-slate-200 shrink-0">
+                      <Image
+                        src={
+                          reviewForm.imagePreview ||
+                          siteContent?.defaultReviewAvatar ||
+                          'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=150'
+                        }
+                        alt="Review preview"
+                        fill
+                        className="object-cover"
+                        referrerPolicy="no-referrer"
+                        unoptimized={Boolean(reviewForm.imagePreview)}
+                      />
+                    </div>
+                    <label className="flex-1 border border-dashed border-slate-300 rounded-none px-4 py-3 text-xs text-slate-500 cursor-pointer hover:bg-slate-50 transition">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          const compressed = await compressImageForUpload(file);
+                          if (reviewForm.imagePreview) URL.revokeObjectURL(reviewForm.imagePreview);
+                          setReviewForm({
+                            ...reviewForm,
+                            imageFile: compressed,
+                            imagePreview: URL.createObjectURL(compressed),
+                          });
+                          e.target.value = '';
+                        }}
+                      />
+                      {t.reviewPhotoHint}
+                    </label>
+                  </div>
+                </div>
+
                 <Button type="submit" fullWidth size="lg" className="mt-0">
                   <Send className="w-4 h-4" /> {t.submitReview}
                 </Button>
@@ -784,7 +841,11 @@ export default function StorefrontPage() {
       </section>
 
       <ScrollReveal>
-        <FaqSection items={faqItems} />
+        <FaqSection
+          items={faqItems}
+          imageDesktop={siteContent?.faqImageDesktop}
+          imageMobile={siteContent?.faqImageMobile}
+        />
       </ScrollReveal>
 
       {/* CONTACT EDITORIAL SECTION */}

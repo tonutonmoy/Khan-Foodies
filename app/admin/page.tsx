@@ -43,6 +43,7 @@ import {
   deleteOrderAction,
   updateSiteContentAction,
   deleteReviewAction,
+  saveReviewAction,
   uploadImageAction,
   saveGalleryItemAction,
   deleteGalleryItemAction,
@@ -93,6 +94,7 @@ export default function AdminDashboardPage() {
   const [editingCategory, setEditingCategory] = useState<Partial<Category> | null>(null);
 
   const [editingGallery, setEditingGallery] = useState<Partial<GalleryItem> | null>(null);
+  const [editingReview, setEditingReview] = useState<Partial<Review> | null>(null);
   const [editingFaq, setEditingFaq] = useState<Partial<FaqItem> | null>(null);
 
   // Expanded orders tracker
@@ -337,6 +339,31 @@ export default function AdminDashboardPage() {
     } else {
       showToast(res.error || 'Delete failed', 'error');
     }
+  };
+
+  const handleSaveReview = () => {
+    if (!editingReview?.id || !editingReview.name || !editingReview.text) {
+      showToast('Name and review text required', 'error');
+      return;
+    }
+    startTransition(async () => {
+      const res = await saveReviewAction(password, {
+        id: editingReview.id!,
+        name: editingReview.name!,
+        rating: editingReview.rating ?? 5,
+        text: editingReview.text!,
+        image: editingReview.image || '',
+        role: editingReview.role,
+        roleBn: editingReview.roleBn,
+      });
+      if (res.success) {
+        showToast('Review updated', 'success');
+        setEditingReview(null);
+        refreshAdminData(password);
+      } else {
+        showToast(res.error || 'Review save failed', 'error');
+      }
+    });
   };
 
   // ORDER CHANGE STATUS 
@@ -1396,6 +1423,79 @@ export default function AdminDashboardPage() {
                   </div>
                 </div>
 
+                {/* 2B. HERO SECTION — 4 GRID IMAGES */}
+                <div className="p-6 bg-stone-50 rounded-2xl border border-stone-100 space-y-6">
+                  <div>
+                    <h4 className="font-serif text-lg font-bold text-stone-900">2B. Hero Section — 4 Grid Images</h4>
+                    <p className="text-[10px] text-stone-400 font-bold uppercase tracking-widest">
+                      Right-side 2×2 image grid on the home page hero (প্রিমিয়াম হিরো সেকশন)
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                    {(
+                      [
+                        ['heroImage1', 'Hero Image 1', 'hero1'],
+                        ['heroImage2', 'Hero Image 2', 'hero2'],
+                        ['heroImage3', 'Hero Image 3', 'hero3'],
+                        ['heroImage4', 'Hero Image 4', 'hero4'],
+                      ] as const
+                    ).map(([field, label, uploadKey]) => (
+                      <div key={field} className="p-4 bg-white rounded-xl border border-stone-200 space-y-2">
+                        <label className="block text-[9px] uppercase font-black text-stone-500">{label}</label>
+                        <input
+                          type="text"
+                          placeholder="Image URL"
+                          value={adminData.siteContent[field] || ''}
+                          onChange={(e) =>
+                            setAdminData({
+                              ...adminData,
+                              siteContent: { ...adminData.siteContent, [field]: e.target.value },
+                            })
+                          }
+                          className="w-full text-stone-800 bg-stone-50 border border-stone-200 px-3 py-2 rounded-lg text-[10px]"
+                        />
+                        <div className="relative border border-dashed border-stone-200 bg-stone-50 rounded-lg p-2 text-center cursor-pointer">
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                            onChange={async (e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                await handleImageUpload(
+                                  file,
+                                  (url) =>
+                                    setAdminData((prev) =>
+                                      prev
+                                        ? { ...prev, siteContent: { ...prev.siteContent, [field]: url } }
+                                        : prev
+                                    ),
+                                  uploadKey
+                                );
+                              }
+                              e.target.value = '';
+                            }}
+                          />
+                          <span className="text-[9px] text-[#1a234d] font-extrabold uppercase">
+                            {uploadingImage === uploadKey ? 'Uploading...' : 'Upload to ImgBB'}
+                          </span>
+                        </div>
+                        {adminData.siteContent[field] && (
+                          <div className="relative w-full h-24 rounded-lg overflow-hidden border border-stone-100">
+                            <Image
+                              src={adminData.siteContent[field]!}
+                              alt={label}
+                              fill
+                              className="object-cover"
+                              referrerPolicy="no-referrer"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
                 {/* 3. ABOUT US CUSTOM STORY SECTION */}
                 <div className="p-6 bg-stone-50 rounded-2xl border border-stone-100 space-y-6">
                   <div>
@@ -1512,6 +1612,77 @@ export default function AdminDashboardPage() {
                         </div>
                       </div>
                     </div>
+                  </div>
+                </div>
+
+                {/* 3B. FAQ & REVIEW IMAGES */}
+                <div className="p-6 bg-stone-50 rounded-2xl border border-stone-100 space-y-6">
+                  <div>
+                    <h4 className="font-serif text-lg font-bold text-stone-900">3B. FAQ & Review Images</h4>
+                    <p className="text-[10px] text-stone-400 font-bold uppercase tracking-widest">
+                      সচরাচর জিজ্ঞাসিত প্রশ্ন section image + default review avatar (MongoDB)
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    {(
+                      [
+                        ['faqImageDesktop', 'FAQ Image (Desktop)', 'faq-desk'],
+                        ['faqImageMobile', 'FAQ Image (Mobile)', 'faq-mob'],
+                        ['defaultReviewAvatar', 'Default Review Avatar', 'review-avatar'],
+                      ] as const
+                    ).map(([field, label, uploadKey]) => (
+                      <div key={field} className="space-y-2">
+                        <label className="block text-[10px] uppercase font-black text-stone-500">{label}</label>
+                        <input
+                          type="text"
+                          value={adminData.siteContent[field] || ''}
+                          onChange={(e) =>
+                            setAdminData({
+                              ...adminData,
+                              siteContent: { ...adminData.siteContent, [field]: e.target.value },
+                            })
+                          }
+                          className="w-full text-stone-800 bg-white border border-stone-200 px-3 py-2 rounded-lg text-[10px]"
+                        />
+                        <div className="relative border border-dashed border-stone-200 bg-stone-50 rounded-lg p-2 text-center cursor-pointer">
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                            onChange={async (e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                await handleImageUpload(
+                                  file,
+                                  (url) =>
+                                    setAdminData((prev) =>
+                                      prev
+                                        ? { ...prev, siteContent: { ...prev.siteContent, [field]: url } }
+                                        : prev
+                                    ),
+                                  uploadKey
+                                );
+                              }
+                              e.target.value = '';
+                            }}
+                          />
+                          <span className="text-[9px] text-[#1a234d] font-extrabold uppercase">
+                            {uploadingImage === uploadKey ? 'Uploading...' : 'Upload to ImgBB'}
+                          </span>
+                        </div>
+                        {adminData.siteContent[field] && (
+                          <div className="relative w-full h-32 rounded-lg overflow-hidden border border-stone-100">
+                            <Image
+                              src={adminData.siteContent[field]!}
+                              alt={label}
+                              fill
+                              className="object-cover"
+                              referrerPolicy="no-referrer"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    ))}
                   </div>
                 </div>
 
@@ -1642,7 +1813,7 @@ export default function AdminDashboardPage() {
               <div>
                 <h3 className="font-serif text-3xl font-black text-stone-900">Gallery Manager</h3>
                 <p className="text-xs text-stone-400 font-bold uppercase tracking-widest mt-1">
-                  Upload up to 3 hover gallery images (slot 1 = main, 2 = left, 3 = right)
+                  প্রাকৃতিক সৌন্দর্যের গ্যালারি — marquee slider images (add/edit items below)
                 </p>
               </div>
               <button
@@ -1919,10 +2090,80 @@ export default function AdminDashboardPage() {
               <div>
                 <h3 className="font-serif text-3xl font-black text-stone-900">Review Moderation</h3>
                 <p className="text-xs text-stone-400 font-bold uppercase tracking-widest mt-1">
-                  Manage user feedback & verified customer testimonials
+                  Edit customer review text & photo, or delete testimonials
                 </p>
               </div>
             </div>
+
+            {editingReview && (
+              <div className="bg-white border border-stone-100 rounded-2xl p-6 space-y-4">
+                <h4 className="font-bold text-stone-900">Edit Review</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <input
+                    placeholder="Customer name"
+                    value={editingReview.name || ''}
+                    onChange={(e) => setEditingReview({ ...editingReview, name: e.target.value })}
+                    className="border border-stone-200 rounded-lg px-3 py-2 text-sm"
+                  />
+                  <input
+                    type="number"
+                    min={1}
+                    max={5}
+                    placeholder="Rating 1-5"
+                    value={editingReview.rating ?? 5}
+                    onChange={(e) => setEditingReview({ ...editingReview, rating: Number(e.target.value) })}
+                    className="border border-stone-200 rounded-lg px-3 py-2 text-sm"
+                  />
+                  <textarea
+                    placeholder="Review text"
+                    value={editingReview.text || ''}
+                    onChange={(e) => setEditingReview({ ...editingReview, text: e.target.value })}
+                    className="border border-stone-200 rounded-lg px-3 py-2 text-sm md:col-span-2"
+                    rows={3}
+                  />
+                  <input
+                    placeholder="Photo URL"
+                    value={editingReview.image || ''}
+                    onChange={(e) => setEditingReview({ ...editingReview, image: e.target.value })}
+                    className="border border-stone-200 rounded-lg px-3 py-2 text-sm md:col-span-2"
+                  />
+                </div>
+                <div className="flex flex-wrap items-center gap-3">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        handleImageUpload(file, (url) => setEditingReview({ ...editingReview, image: url }), 'review-edit');
+                      }
+                      e.target.value = '';
+                    }}
+                    className="text-xs"
+                  />
+                  {editingReview.image && (
+                    <div className="relative w-12 h-12 rounded-full overflow-hidden border border-stone-200">
+                      <Image src={editingReview.image} alt="" fill className="object-cover" referrerPolicy="no-referrer" />
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={handleSaveReview}
+                    disabled={isPending}
+                    className="bg-[#1a234d] text-white text-xs font-bold px-4 py-2 rounded-lg"
+                  >
+                    Save Review
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditingReview(null)}
+                    className="text-xs font-bold text-stone-500"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {adminData.reviews.length === 0 ? (
@@ -1967,12 +2208,20 @@ export default function AdminDashboardPage() {
                     </div>
 
                     {/* Footer operations */}
-                    <div className="mt-6 pt-4 border-t border-stone-50 flex items-center justify-between">
-                      <span className="text-[10px] text-stone-400 font-black uppercase tracking-widest">
+                    <div className="mt-6 pt-4 border-t border-stone-50 flex items-center justify-between gap-2">
+                      <span className="text-[10px] text-stone-400 font-black uppercase tracking-widest truncate">
                         ID: {rev.id}
                       </span>
-                      <button
-                        onClick={() => {
+                      <div className="flex items-center gap-3">
+                        <button
+                          type="button"
+                          onClick={() => setEditingReview({ ...rev })}
+                          className="flex items-center gap-1 hover:text-[#1a234d] text-stone-500 text-xs font-bold transition cursor-pointer"
+                        >
+                          <Edit className="w-3.5 h-3.5" /> Edit
+                        </button>
+                        <button
+                          onClick={() => {
                           if (confirm('Are you absolutely sure you want to delete this customer review?')) {
                             startTransition(async () => {
                               const r = await deleteReviewAction(password, rev.id);
@@ -1988,8 +2237,9 @@ export default function AdminDashboardPage() {
                         disabled={isPending}
                         className="flex items-center gap-1 hover:text-[#1a234d] text-stone-400 text-xs font-bold transition cursor-pointer"
                       >
-                        <Trash2 className="w-3.5 h-3.5" /> Delete Review
+                        <Trash2 className="w-3.5 h-3.5" /> Delete
                       </button>
+                      </div>
                     </div>
                   </div>
                 ))

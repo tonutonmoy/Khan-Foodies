@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Review } from '@/lib/types';
 import { t } from '@/lib/i18n-bn';
+import { DEFAULT_REVIEW_AVATAR } from '@/lib/defaults';
 
 interface ReviewSliderProps {
   reviews: Review[];
@@ -96,7 +97,7 @@ export function ReviewSlider({ reviews }: ReviewSliderProps) {
                       ${hidden ? 'translate-y-[150px] scale-0' : 'translate-y-0 scale-100'}`}
                   >
                     <Image
-                      src={review.image}
+                      src={review.image || DEFAULT_REVIEW_AVATAR}
                       alt={review.name}
                       width={64}
                       height={64}

@@ -66,6 +66,8 @@ export const t = {
   ratingLabel: 'রেটিং দিন',
   reviewTextLabel: 'আপনার অভিজ্ঞতা',
   reviewTextPlaceholder: 'স্বাদ, গন্ধ, ডেলিভারি সময়, প্যাকেজিং...',
+  reviewPhotoLabel: 'আপনার ছবি (ঐচ্ছিক)',
+  reviewPhotoHint: 'ছবি না দিলে ডিফল্ট অ্যাভাটার ব্যবহার হবে',
   submitReview: 'রিভিউ জমা দিন',
   contactConnect: 'যোগাযোগ করুন',
   contactHeading: 'সবসময় আপনার সেবায়',

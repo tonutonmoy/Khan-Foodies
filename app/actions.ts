@@ -4,6 +4,7 @@ import { unstable_cache, revalidateTag } from 'next/cache';
 import { db } from '@/lib/db';
 import { fileToBase64, uploadToImgBB } from '@/lib/imgbb';
 import { trackMetaPurchase, type MetaBrowserContext } from '@/lib/meta-capi';
+import { DEFAULT_REVIEW_AVATAR } from '@/lib/defaults';
 import type { SiteContent } from '@/lib/types';
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
@@ -304,18 +305,60 @@ export async function deleteContactMessageAction(password: string, id: string) {
   }
 }
 
-export async function submitReviewAction(contact: {
-  name: string;
-  rating: number;
-  text: string;
-  image?: string;
-}) {
+export async function submitReviewAction(formData: FormData) {
   try {
-    const review = await db.addReview(contact.name, contact.rating, contact.text, contact.image);
+    const name = String(formData.get('name') || '').trim();
+    const rating = Number(formData.get('rating'));
+    const text = String(formData.get('text') || '').trim();
+    const defaultAvatar = String(formData.get('defaultAvatar') || '').trim();
+    const file = formData.get('image');
+
+    if (!name || !text || !rating) {
+      return { success: false, error: 'Name, rating and review text are required' };
+    }
+
+    let imageUrl = defaultAvatar;
+    if (file instanceof File && file.size > 0) {
+      if (!file.type.startsWith('image/')) {
+        return { success: false, error: 'File must be an image' };
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        return { success: false, error: 'Image must be under 5MB' };
+      }
+      const base64 = await fileToBase64(file);
+      const result = await uploadToImgBB(base64, `review-${name.replace(/\s+/g, '-')}`);
+      imageUrl = result.displayUrl || result.url;
+    }
+
+    if (!imageUrl) {
+      const siteContent = await db.getSiteContent();
+      imageUrl = siteContent?.defaultReviewAvatar || DEFAULT_REVIEW_AVATAR;
+    }
+
+    const review = await db.addReview(name, rating, text, imageUrl);
     invalidateStoreCache();
     return { success: true, review };
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Failed to submit review';
+    return { success: false, error: message };
+  }
+}
+
+export async function saveReviewAction(password: string, review: import('@/lib/types').Review) {
+  if (password !== ADMIN_PASSWORD) {
+    return { success: false, error: 'Unauthorized' };
+  }
+
+  if (!review.id || !review.name || !review.text) {
+    return { success: false, error: 'Missing review fields' };
+  }
+
+  try {
+    const saved = await db.saveReview(review);
+    invalidateStoreCache();
+    return { success: true, review: saved };
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Failed to save review';
     return { success: false, error: message };
   }
 }

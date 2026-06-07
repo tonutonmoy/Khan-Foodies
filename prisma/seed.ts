@@ -1,4 +1,10 @@
 import { PrismaClient } from '@prisma/client';
+import {
+  DEFAULT_FAQ_IMAGE_DESKTOP,
+  DEFAULT_FAQ_IMAGE_MOBILE,
+  DEFAULT_HERO_IMAGES,
+  DEFAULT_REVIEW_AVATAR,
+} from '../lib/defaults';
 
 const prisma = new PrismaClient();
 
@@ -219,6 +225,13 @@ const defaultSiteContent = {
   instagramUrl: 'https://instagram.com/khanfoods',
   footerText: '© 2026 Khan Foods. Crafted for ultimate pure luxury, wholesomeness, and standard-setting dietary health solutions locally.',
   footerTextBn: '© ২০২৬ খান ফুডস। শতভাগ খাঁটি, স্বাস্থ্যকর এবং সুস্বাদু পুষ্টিকর খাদ্যের বিশ্বস্ত ঠিকানা।',
+  heroImage1: DEFAULT_HERO_IMAGES[0],
+  heroImage2: DEFAULT_HERO_IMAGES[1],
+  heroImage3: DEFAULT_HERO_IMAGES[2],
+  heroImage4: DEFAULT_HERO_IMAGES[3],
+  faqImageDesktop: DEFAULT_FAQ_IMAGE_DESKTOP,
+  faqImageMobile: DEFAULT_FAQ_IMAGE_MOBILE,
+  defaultReviewAvatar: DEFAULT_REVIEW_AVATAR,
 };
 
 async function main() {

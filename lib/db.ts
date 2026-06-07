@@ -1,4 +1,10 @@
 import { prisma } from './prisma';
+import {
+  DEFAULT_FAQ_IMAGE_DESKTOP,
+  DEFAULT_FAQ_IMAGE_MOBILE,
+  DEFAULT_HERO_IMAGES,
+  DEFAULT_REVIEW_AVATAR,
+} from './defaults';
 import type { Category, Product, Order, Review, SiteContent, OrderItem, GalleryItem, FaqItem } from './types';
 
 function mapCategory(c: {
@@ -107,8 +113,24 @@ function mapSiteContent(s: {
   instagramUrl: string;
   footerText: string;
   footerTextBn: string;
+  heroImage1?: string | null;
+  heroImage2?: string | null;
+  heroImage3?: string | null;
+  heroImage4?: string | null;
+  faqImageDesktop?: string | null;
+  faqImageMobile?: string | null;
+  defaultReviewAvatar?: string | null;
 }): SiteContent {
-  return { ...s };
+  return {
+    ...s,
+    heroImage1: s.heroImage1 || DEFAULT_HERO_IMAGES[0],
+    heroImage2: s.heroImage2 || DEFAULT_HERO_IMAGES[1],
+    heroImage3: s.heroImage3 || DEFAULT_HERO_IMAGES[2],
+    heroImage4: s.heroImage4 || DEFAULT_HERO_IMAGES[3],
+    faqImageDesktop: s.faqImageDesktop || DEFAULT_FAQ_IMAGE_DESKTOP,
+    faqImageMobile: s.faqImageMobile || DEFAULT_FAQ_IMAGE_MOBILE,
+    defaultReviewAvatar: s.defaultReviewAvatar || DEFAULT_REVIEW_AVATAR,
+  };
 }
 
 export const db = {
@@ -290,9 +312,7 @@ export const db = {
         name,
         rating: Number(rating),
         text,
-        image:
-          image ||
-          'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=150',
+        image: image || DEFAULT_REVIEW_AVATAR,
         role: role || null,
         roleBn: roleBn || null,
       },
@@ -315,6 +335,29 @@ export const db = {
     } catch {
       return false;
     }
+  },
+
+  saveReview: async (review: Review): Promise<Review> => {
+    const updated = await prisma.review.update({
+      where: { id: review.id },
+      data: {
+        name: review.name,
+        rating: review.rating,
+        text: review.text,
+        image: review.image,
+        role: review.role || null,
+        roleBn: review.roleBn || null,
+      },
+    });
+    return {
+      id: updated.id,
+      name: updated.name,
+      rating: updated.rating,
+      text: updated.text,
+      image: updated.image,
+      role: updated.role ?? undefined,
+      roleBn: updated.roleBn ?? undefined,
+    };
   },
 
   getSiteContent: async (): Promise<SiteContent | null> => {

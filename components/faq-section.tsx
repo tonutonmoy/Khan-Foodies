@@ -5,9 +5,12 @@ import Image from 'next/image';
 import { Search } from 'lucide-react';
 import { FaqItem } from '@/lib/types';
 import { t } from '@/lib/i18n-bn';
+import { DEFAULT_FAQ_IMAGE_DESKTOP, DEFAULT_FAQ_IMAGE_MOBILE } from '@/lib/defaults';
 
 interface FaqSectionProps {
   items: FaqItem[];
+  imageDesktop?: string;
+  imageMobile?: string;
 }
 
 const FALLBACK_ITEMS: FaqItem[] = [
@@ -17,7 +20,7 @@ const FALLBACK_ITEMS: FaqItem[] = [
   { id: '4', question: t.faqTrackingQ, answer: t.faqTrackingA, sortOrder: 3 },
 ];
 
-export function FaqSection({ items }: FaqSectionProps) {
+export function FaqSection({ items, imageDesktop, imageMobile }: FaqSectionProps) {
   const faqItems = items.length > 0 ? items : FALLBACK_ITEMS;
   const [openId, setOpenId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
@@ -35,6 +38,9 @@ export function FaqSection({ items }: FaqSectionProps) {
   const toggle = (id: string) => {
     setOpenId((prev) => (prev === id ? null : id));
   };
+
+  const faqDesktop = imageDesktop || DEFAULT_FAQ_IMAGE_DESKTOP;
+  const faqMobile = imageMobile || DEFAULT_FAQ_IMAGE_MOBILE;
 
   return (
     <section id="faq" className="py-16 md:py-20 kf-section-card border-t">
@@ -62,14 +68,14 @@ export function FaqSection({ items }: FaqSectionProps) {
         <div className="flex flex-col md:flex-row md:space-x-8 md:mt-16 mt-8 gap-10 md:gap-0">
           <div className="md:w-5/12 lg:w-4/12 w-full">
             <Image
-              src="https://i.ibb.co/8bCs73h/pexels-ron-lach-8128069-1.png"
+              src={faqDesktop}
               alt={t.faqImageAlt}
               width={600}
               height={800}
               className="w-full hidden md:block rounded-lg object-cover"
             />
             <Image
-              src="https://i.ibb.co/gZMfQJq/pexels-ron-lach-8128069-1-1.png"
+              src={faqMobile}
               alt={t.faqImageAlt}
               width={600}
               height={400}

@@ -137,6 +137,14 @@ model SiteContent {
   footerText        String
   footerTextBn      String
 
+  heroImage1          String?
+  heroImage2          String?
+  heroImage3          String?
+  heroImage4          String?
+  faqImageDesktop     String?
+  faqImageMobile      String?
+  defaultReviewAvatar String?
+
   @@map("site_content")
 }
 
