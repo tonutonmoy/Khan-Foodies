@@ -50,7 +50,13 @@ import {
   getMetaBrowserContext,
   trackMetaBrowserEvent,
 } from '@/lib/meta-events';
-import { Category, Product, Review, SiteContent, GalleryItem, FaqItem } from '@/lib/types';
+import { Category, Product, Review, SiteContent, GalleryItem, FaqItem, ShippingCharge } from '@/lib/types';
+import {
+  cartQualifiesForFreeShipping,
+  computeDeliveryFee,
+  formatShippingFee,
+  shippingFeeRangeLabel,
+} from '@/lib/shipping';
 import { ScrollReveal } from '@/components/scroll-reveal';
 import { ProductCard } from '@/components/product-card';
 import { Button } from '@/components/button';
@@ -124,6 +130,7 @@ export default function StorefrontPage() {
   const [reviews, setReviews] = useState<Review[]>([]);
   const [galleryItems, setGalleryItems] = useState<GalleryItem[]>([]);
   const [faqItems, setFaqItems] = useState<FaqItem[]>([]);
+  const [shippingCharges, setShippingCharges] = useState<ShippingCharge[]>([]);
   const [siteContent, setSiteContent] = useState<SiteContent | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -173,7 +180,7 @@ export default function StorefrontPage() {
     phone: '',
     address: '',
     notes: '',
-    deliveryZone: '' as 'inside_dhaka' | 'outside_dhaka' | '',
+    deliveryZone: '',
   });
   
   const [contactForm, setContactForm] = useState({
@@ -215,6 +222,7 @@ export default function StorefrontPage() {
         setReviews(res.reviews || []);
         setGalleryItems(res.galleryItems || []);
         setFaqItems(res.faqItems || []);
+        setShippingCharges(res.shippingCharges || []);
         setSiteContent(res.siteContent || null);
       } else {
         showToast('স্টোর লোড করতে সমস্যা হয়েছে।', 'error');
@@ -352,16 +360,16 @@ export default function StorefrontPage() {
     return sum + activePrice * item.quantity;
   }, 0);
 
-  const getDeliveryFee = (zone: typeof checkoutForm.deliveryZone) => {
-    if (subtotal === 0) return 0;
-    if (subtotal >= 1500) return 0;
-    if (zone === 'inside_dhaka') return 80;
-    if (zone === 'outside_dhaka') return 150;
-    return 0;
-  };
-
-  const deliveryFee = getDeliveryFee(checkoutForm.deliveryZone);
+  const activeShipping = shippingCharges.filter((z) => z.active);
+  const cartIsFreeShipping = cartQualifiesForFreeShipping(cart);
+  const deliveryFee = computeDeliveryFee(
+    subtotal,
+    cart,
+    checkoutForm.deliveryZone,
+    activeShipping
+  );
   const total = subtotal + deliveryFee;
+  const selectedShipping = activeShipping.find((z) => z.id === checkoutForm.deliveryZone);
 
   // Search and categorization filtering
   const filteredProducts = products.filter((product) => {
@@ -380,15 +388,18 @@ export default function StorefrontPage() {
       showToast('নাম, ফোন ও ঠিকানা পূরণ করুন!', 'error');
       return;
     }
-    if (!checkoutForm.deliveryZone) {
+    if (!cartIsFreeShipping && subtotal < 1500 && !checkoutForm.deliveryZone) {
       showToast(t.deliveryZoneRequired, 'error');
       return;
     }
 
-    const zoneLabel =
-      checkoutForm.deliveryZone === 'inside_dhaka'
-        ? `${t.insideDhaka} — ${t.deliveryInsideFee}`
-        : `${t.outsideDhaka} — ${t.deliveryOutsideFee}`;
+    const zoneLabel = selectedShipping
+      ? `${selectedShipping.nameBn || selectedShipping.name} — ${deliveryFee.toLocaleString()} BDT`
+      : cartIsFreeShipping
+        ? t.freeShippingCartNote
+        : subtotal >= 1500
+          ? t.freeDeliveryUnlocked
+          : '';
     const combinedNotes = [zoneLabel, checkoutForm.notes].filter(Boolean).join(' | ');
 
     const orderItems = cart.map((item) => ({
@@ -1028,7 +1039,6 @@ export default function StorefrontPage() {
                     <span className="font-bold text-stone-800 text-sm">
                       {quickViewProduct.rating.toFixed(1)}
                     </span>
-                    <span className="text-stone-400 text-xs">স্টক যাচাই সম্পন্ন</span>
                   </div>
 
                   <p className="text-stone-600 text-sm leading-relaxed mb-6">
@@ -1041,9 +1051,6 @@ export default function StorefrontPage() {
                     </p>
                     <p className="flex items-center gap-1">
                       <span className="font-bold text-stone-700">{t.labAnalysis}:</span> {t.labValue}
-                    </p>
-                    <p className="flex items-center gap-1">
-                      <span className="font-bold text-stone-700">{t.availability}:</span> {quickViewProduct.stock > 0 ? `${quickViewProduct.stock} পিস বাকি` : t.restocking}
                     </p>
                   </div>
                 </div>
@@ -1232,29 +1239,27 @@ export default function StorefrontPage() {
                       </div>
                       <div className="flex justify-between">
                         <span className="text-stone-500 font-medium">{t.deliveryFee}</span>
-                        {subtotal >= 1500 ? (
-                          <span className="font-bold text-emerald-600">{t.free}</span>
-                        ) : checkoutForm.deliveryZone === 'inside_dhaka' ? (
-                          <span className="font-bold">80 BDT</span>
-                        ) : checkoutForm.deliveryZone === 'outside_dhaka' ? (
-                          <span className="font-bold">150 BDT</span>
-                        ) : (
-                          <span className="font-bold text-stone-500 text-xs">
-                            ৮০–১৫০ BDT
-                          </span>
-                        )}
+                        <span className="font-bold">
+                          {formatShippingFee(deliveryFee, subtotal, cart, t.free)}
+                        </span>
                       </div>
+                      {cartIsFreeShipping && subtotal > 0 && subtotal < 1500 && (
+                        <p className="text-[10px] text-emerald-700 font-semibold">{t.freeShippingCartNote}</p>
+                      )}
                       <div className="flex justify-between text-base pt-2 border-t font-black">
                         <span className="font-serif">{t.totalBill}</span>
                         <span className="text-[var(--kf-primary)] text-lg">
-                          {(checkoutForm.deliveryZone || subtotal >= 1500
+                          {(checkoutForm.deliveryZone || subtotal >= 1500 || cartIsFreeShipping
                             ? total
                             : subtotal
                           ).toLocaleString()}{' '}
                           BDT
-                          {!checkoutForm.deliveryZone && subtotal > 0 && subtotal < 1500 && (
+                          {!checkoutForm.deliveryZone &&
+                            subtotal > 0 &&
+                            subtotal < 1500 &&
+                            !cartIsFreeShipping && (
                             <span className="block text-[10px] font-medium text-stone-400 normal-case tracking-normal">
-                              + {t.deliveryFeeAtCheckout}
+                              + {shippingFeeRangeLabel(activeShipping)}
                             </span>
                           )}
                         </span>
@@ -1361,36 +1366,42 @@ export default function StorefrontPage() {
                     {t.sectionDelivery}
                   </h4>
                   <p className="text-xs text-stone-500">{t.selectDeliveryZone}</p>
-                  <div className="grid grid-cols-2 gap-3">
-                    <button
-                      type="button"
-                      onClick={() => setCheckoutForm({ ...checkoutForm, deliveryZone: 'inside_dhaka' })}
-                      className={`p-4 rounded-xl border-2 text-left transition ${
-                        checkoutForm.deliveryZone === 'inside_dhaka'
-                          ? 'border-[var(--kf-primary)] bg-[var(--kf-primary-light)]/40 shadow-md'
-                          : 'border-stone-200 bg-stone-50 hover:border-[var(--kf-peach)]'
-                      }`}
-                    >
-                      <span className="block text-sm font-black text-stone-900">{t.insideDhaka}</span>
-                      <span className="block text-xs font-bold text-[var(--kf-primary)] mt-1">
-                        {t.deliveryInsideFee}
-                      </span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setCheckoutForm({ ...checkoutForm, deliveryZone: 'outside_dhaka' })}
-                      className={`p-4 rounded-xl border-2 text-left transition ${
-                        checkoutForm.deliveryZone === 'outside_dhaka'
-                          ? 'border-[var(--kf-primary)] bg-[var(--kf-primary-light)]/40 shadow-md'
-                          : 'border-stone-200 bg-stone-50 hover:border-[var(--kf-peach)]'
-                      }`}
-                    >
-                      <span className="block text-sm font-black text-stone-900">{t.outsideDhaka}</span>
-                      <span className="block text-xs font-bold text-[var(--kf-primary)] mt-1">
-                        {t.deliveryOutsideFee}
-                      </span>
-                    </button>
-                  </div>
+                  {activeShipping.length === 0 ? (
+                    <p className="text-xs text-stone-400">{t.noShippingZones}</p>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {activeShipping.map((zone) => {
+                        const zoneFee =
+                          subtotal >= 1500 || cartIsFreeShipping
+                            ? 0
+                            : zone.fee;
+                        return (
+                          <button
+                            key={zone.id}
+                            type="button"
+                            onClick={() => setCheckoutForm({ ...checkoutForm, deliveryZone: zone.id })}
+                            className={`p-4 rounded-xl border-2 text-left transition ${
+                              checkoutForm.deliveryZone === zone.id
+                                ? 'border-[var(--kf-primary)] bg-[var(--kf-primary-light)]/40 shadow-md'
+                                : 'border-stone-200 bg-stone-50 hover:border-[var(--kf-peach)]'
+                            }`}
+                          >
+                            <span className="block text-sm font-black text-stone-900">
+                              {zone.nameBn || zone.name}
+                            </span>
+                            <span className="block text-xs font-bold text-[var(--kf-primary)] mt-1">
+                              {zoneFee === 0 ? t.free : `${zone.fee.toLocaleString()} BDT`}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                  {cartIsFreeShipping && subtotal > 0 && subtotal < 1500 && (
+                    <p className="text-xs font-bold text-emerald-700 flex items-center gap-1">
+                      <Check className="w-3.5 h-3.5" /> {t.freeShippingCartNote}
+                    </p>
+                  )}
                   {subtotal >= 1500 && (
                     <p className="text-xs font-bold text-emerald-700 flex items-center gap-1">
                       <Check className="w-3.5 h-3.5" /> {t.freeDeliveryUnlocked}
@@ -1451,15 +1462,14 @@ export default function StorefrontPage() {
                   <div className="flex justify-between text-stone-600">
                     <span>{t.deliveryFee}</span>
                     <span className="font-bold">
-                      {subtotal >= 1500
-                        ? t.free
-                        : checkoutForm.deliveryZone === 'inside_dhaka'
-                          ? '80 BDT'
-                          : checkoutForm.deliveryZone === 'outside_dhaka'
-                            ? '150 BDT'
-                            : '—'}
+                      {formatShippingFee(deliveryFee, subtotal, cart, t.free)}
                     </span>
                   </div>
+                  {selectedShipping && deliveryFee > 0 && (
+                    <p className="text-[10px] text-stone-500">
+                      {selectedShipping.nameBn || selectedShipping.name}
+                    </p>
+                  )}
                   <div className="pt-2 border-t flex justify-between text-sm font-black text-stone-950">
                     <span>{t.totalBill}</span>
                     <span className="text-[var(--kf-primary)]">{total.toLocaleString()} BDT</span>

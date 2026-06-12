@@ -30,6 +30,7 @@ model Product {
   status        String  @default("Active")
   rating        Float   @default(4.8)
   image         String
+  freeShipping  Boolean @default(false)
 
   @@index([status])
   @@index([category])
@@ -146,6 +147,17 @@ model SiteContent {
   defaultReviewAvatar String?
 
   @@map("site_content")
+}
+
+model ShippingCharge {
+  id        String  @id @default(cuid()) @map("_id")
+  name      String
+  nameBn    String?
+  fee       Float
+  sortOrder Int     @default(0)
+  active    Boolean @default(true)
+
+  @@map("shipping_charges")
 }
 
 model ContactMessage {

@@ -11,14 +11,16 @@ const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
 
 const getCachedStoreData = unstable_cache(
   async () => {
-    const [categories, products, reviews, siteContent, galleryItems, faqItems] = await Promise.all([
-      db.getCategories(),
-      db.getProducts(),
-      db.getReviews(),
-      db.getSiteContent(),
-      db.getGalleryItems(),
-      db.getFaqItems(),
-    ]);
+    const [categories, products, reviews, siteContent, galleryItems, faqItems, shippingCharges] =
+      await Promise.all([
+        db.getCategories(),
+        db.getProducts(),
+        db.getReviews(),
+        db.getSiteContent(),
+        db.getGalleryItems(),
+        db.getFaqItems(),
+        db.getShippingCharges(),
+      ]);
 
     return {
       categories,
@@ -27,6 +29,7 @@ const getCachedStoreData = unstable_cache(
       siteContent,
       galleryItems,
       faqItems,
+      shippingCharges: shippingCharges.filter((s) => s.active),
     };
   },
   ['store-data'],
@@ -61,15 +64,17 @@ export async function getAdminData(password: string) {
   }
 
   try {
-    const [categories, products, orders, reviews, siteContent, galleryItems, faqItems] = await Promise.all([
-      db.getCategories(),
-      db.getProducts(),
-      db.getOrders(),
-      db.getReviews(),
-      db.getSiteContent(),
-      db.getGalleryItems(),
-      db.getFaqItems(),
-    ]);
+    const [categories, products, orders, reviews, siteContent, galleryItems, faqItems, shippingCharges] =
+      await Promise.all([
+        db.getCategories(),
+        db.getProducts(),
+        db.getOrders(),
+        db.getReviews(),
+        db.getSiteContent(),
+        db.getGalleryItems(),
+        db.getFaqItems(),
+        db.getShippingCharges(),
+      ]);
 
     return {
       success: true,
@@ -80,6 +85,7 @@ export async function getAdminData(password: string) {
       siteContent,
       galleryItems,
       faqItems,
+      shippingCharges,
     };
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Failed to fetch admin data';
@@ -154,6 +160,7 @@ export async function saveProductAction(password: string, productData: Record<st
       stock: Number(productData.stock || 0),
       status: (productData.status as 'Active' | 'Draft') || 'Active',
       image: productData.image as string,
+      freeShipping: Boolean(productData.freeShipping),
     });
 
     invalidateStoreCache();
@@ -349,8 +356,8 @@ export async function saveReviewAction(password: string, review: import('@/lib/t
     return { success: false, error: 'Unauthorized' };
   }
 
-  if (!review.id || !review.name || !review.text) {
-    return { success: false, error: 'Missing review fields' };
+  if (!review.name || !review.text) {
+    return { success: false, error: 'Name and review text are required' };
   }
 
   try {
@@ -487,6 +494,43 @@ export async function deleteFaqItemAction(password: string, id: string) {
     return { success };
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Failed to delete FAQ item';
+    return { success: false, error: message };
+  }
+}
+
+export async function saveShippingChargeAction(
+  password: string,
+  item: import('@/lib/types').ShippingCharge
+) {
+  if (password !== ADMIN_PASSWORD) {
+    return { success: false, error: 'Unauthorized' };
+  }
+
+  if (!item.name || item.fee === undefined || item.fee === null) {
+    return { success: false, error: 'Name and fee are required' };
+  }
+
+  try {
+    const saved = await db.saveShippingCharge(item);
+    invalidateStoreCache();
+    return { success: true, item: saved };
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Failed to save shipping charge';
+    return { success: false, error: message };
+  }
+}
+
+export async function deleteShippingChargeAction(password: string, id: string) {
+  if (password !== ADMIN_PASSWORD) {
+    return { success: false, error: 'Unauthorized' };
+  }
+
+  try {
+    const success = await db.deleteShippingCharge(id);
+    invalidateStoreCache();
+    return { success };
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Failed to delete shipping charge';
     return { success: false, error: message };
   }
 }

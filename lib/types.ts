@@ -19,6 +19,16 @@ export interface Product {
   status: 'Active' | 'Draft';
   rating: number;
   image: string;
+  freeShipping?: boolean;
+}
+
+export interface ShippingCharge {
+  id: string;
+  name: string;
+  nameBn?: string;
+  fee: number;
+  sortOrder: number;
+  active: boolean;
 }
 
 export interface OrderItem {

@@ -281,6 +281,17 @@ async function main() {
     console.log(`✅ ${defaultFaq.length} FAQ items seeded`);
   }
 
+  const shippingCount = await prisma.shippingCharge.count();
+  if (shippingCount === 0) {
+    await prisma.shippingCharge.createMany({
+      data: [
+        { name: 'Inside Dhaka', nameBn: 'ঢাকার ভেতর', fee: 80, sortOrder: 0, active: true },
+        { name: 'Outside Dhaka', nameBn: 'ঢাকার বাইরে', fee: 150, sortOrder: 1, active: true },
+      ],
+    });
+    console.log('✅ Default shipping charges seeded');
+  }
+
   const { id: _siteId, ...siteData } = defaultSiteContent;
   await prisma.siteContent.upsert({
     where: { id: 'main' },

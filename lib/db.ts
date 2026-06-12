@@ -5,7 +5,17 @@ import {
   DEFAULT_HERO_IMAGES,
   DEFAULT_REVIEW_AVATAR,
 } from './defaults';
-import type { Category, Product, Order, Review, SiteContent, OrderItem, GalleryItem, FaqItem } from './types';
+import type {
+  Category,
+  Product,
+  Order,
+  Review,
+  SiteContent,
+  OrderItem,
+  GalleryItem,
+  FaqItem,
+  ShippingCharge,
+} from './types';
 
 function mapCategory(c: {
   id: string;
@@ -36,6 +46,7 @@ function mapProduct(p: {
   status: string;
   rating: number;
   image: string;
+  freeShipping?: boolean | null;
 }): Product {
   return {
     id: p.id,
@@ -50,6 +61,7 @@ function mapProduct(p: {
     status: p.status as Product['status'],
     rating: p.rating,
     image: p.image,
+    freeShipping: p.freeShipping ?? false,
   };
 }
 
@@ -198,6 +210,7 @@ export const db = {
           status: product.status || 'Active',
           image: product.image,
           rating: existing?.rating ?? product.rating ?? 4.8,
+          freeShipping: Boolean(product.freeShipping),
         },
       });
       return mapProduct(updated);
@@ -216,6 +229,7 @@ export const db = {
         stock: Number(product.stock || 0),
         status: product.status || 'Active',
         rating: 4.8,
+        freeShipping: Boolean(product.freeShipping),
         image:
           product.image ||
           'https://images.unsplash.com/photo-1541832676-9b763b0239ab?auto=format&fit=crop&q=80&w=600',
@@ -338,25 +352,40 @@ export const db = {
   },
 
   saveReview: async (review: Review): Promise<Review> => {
-    const updated = await prisma.review.update({
-      where: { id: review.id },
-      data: {
-        name: review.name,
-        rating: review.rating,
-        text: review.text,
-        image: review.image,
-        role: review.role || null,
-        roleBn: review.roleBn || null,
-      },
-    });
+    const data = {
+      name: review.name,
+      rating: Number(review.rating),
+      text: review.text,
+      image: review.image || DEFAULT_REVIEW_AVATAR,
+      role: review.role || null,
+      roleBn: review.roleBn || null,
+    };
+
+    if (review.id) {
+      const updated = await prisma.review.update({
+        where: { id: review.id },
+        data,
+      });
+      return {
+        id: updated.id,
+        name: updated.name,
+        rating: updated.rating,
+        text: updated.text,
+        image: updated.image,
+        role: updated.role ?? undefined,
+        roleBn: updated.roleBn ?? undefined,
+      };
+    }
+
+    const created = await prisma.review.create({ data });
     return {
-      id: updated.id,
-      name: updated.name,
-      rating: updated.rating,
-      text: updated.text,
-      image: updated.image,
-      role: updated.role ?? undefined,
-      roleBn: updated.roleBn ?? undefined,
+      id: created.id,
+      name: created.name,
+      rating: created.rating,
+      text: created.text,
+      image: created.image,
+      role: created.role ?? undefined,
+      roleBn: created.roleBn ?? undefined,
     };
   },
 
@@ -511,6 +540,61 @@ export const db = {
   deleteFaqItem: async (id: string): Promise<boolean> => {
     try {
       await prisma.faqItem.delete({ where: { id } });
+      return true;
+    } catch {
+      return false;
+    }
+  },
+
+  getShippingCharges: async (): Promise<ShippingCharge[]> => {
+    const rows = await prisma.shippingCharge.findMany({
+      orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+    });
+    return rows.map((s) => ({
+      id: s.id,
+      name: s.name,
+      nameBn: s.nameBn ?? undefined,
+      fee: s.fee,
+      sortOrder: s.sortOrder,
+      active: s.active,
+    }));
+  },
+
+  saveShippingCharge: async (item: ShippingCharge): Promise<ShippingCharge> => {
+    const data = {
+      name: item.name,
+      nameBn: item.nameBn || null,
+      fee: Number(item.fee),
+      sortOrder: Number(item.sortOrder ?? 0),
+      active: item.active !== false,
+    };
+
+    if (item.id) {
+      const updated = await prisma.shippingCharge.update({ where: { id: item.id }, data });
+      return {
+        id: updated.id,
+        name: updated.name,
+        nameBn: updated.nameBn ?? undefined,
+        fee: updated.fee,
+        sortOrder: updated.sortOrder,
+        active: updated.active,
+      };
+    }
+
+    const created = await prisma.shippingCharge.create({ data });
+    return {
+      id: created.id,
+      name: created.name,
+      nameBn: created.nameBn ?? undefined,
+      fee: created.fee,
+      sortOrder: created.sortOrder,
+      active: created.active,
+    };
+  },
+
+  deleteShippingCharge: async (id: string): Promise<boolean> => {
+    try {
+      await prisma.shippingCharge.delete({ where: { id } });
       return true;
     } catch {
       return false;

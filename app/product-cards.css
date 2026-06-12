@@ -45,7 +45,7 @@
     [heading-end price-start]
     max-content
     [price-end full-end];
-  grid-template-rows: auto auto auto auto auto auto;
+  grid-template-rows: auto auto auto auto auto;
   gap: var(--_row-gap) 1rem;
   padding: var(--_padding);
   border-radius: var(--_radius);
@@ -273,16 +273,3 @@
   cursor: not-allowed;
 }
 
-.product-cards .pc-stock {
-  grid-row: 6;
-  margin: 0;
-  font-size: 0.7rem;
-  font-weight: 600;
-  color: #94a3b8;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.product-cards .pc-stock--out {
-  color: var(--kf-navy);
-}

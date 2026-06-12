@@ -29,6 +29,7 @@ import {
   Images,
   CircleHelp,
   MessageSquare,
+  Truck,
 } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -49,10 +50,21 @@ import {
   deleteGalleryItemAction,
   saveFaqItemAction,
   deleteFaqItemAction,
+  saveShippingChargeAction,
+  deleteShippingChargeAction,
   getContactMessagesAction,
   deleteContactMessageAction,
 } from '../actions';
-import { Category, Product, Order, Review, SiteContent, GalleryItem, FaqItem } from '@/lib/types';
+import {
+  Category,
+  Product,
+  Order,
+  Review,
+  SiteContent,
+  GalleryItem,
+  FaqItem,
+  ShippingCharge,
+} from '@/lib/types';
 import { AdminOrderNotification } from '@/components/admin-order-notification';
 import { compressImageForUpload } from '@/lib/compress-image';
 
@@ -67,11 +79,21 @@ export default function AdminDashboardPage() {
     siteContent: SiteContent;
     galleryItems: GalleryItem[];
     faqItems: FaqItem[];
+    shippingCharges: ShippingCharge[];
   } | null>(null);
 
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<
-    'overview' | 'products' | 'categories' | 'orders' | 'content' | 'reviews' | 'gallery' | 'faq' | 'messages'
+    | 'overview'
+    | 'products'
+    | 'categories'
+    | 'orders'
+    | 'content'
+    | 'reviews'
+    | 'gallery'
+    | 'faq'
+    | 'shipping'
+    | 'messages'
   >('overview');
   
   // Transition support
@@ -94,8 +116,12 @@ export default function AdminDashboardPage() {
   const [editingCategory, setEditingCategory] = useState<Partial<Category> | null>(null);
 
   const [editingGallery, setEditingGallery] = useState<Partial<GalleryItem> | null>(null);
+  const [showGalleryDialog, setShowGalleryDialog] = useState(false);
   const [editingReview, setEditingReview] = useState<Partial<Review> | null>(null);
+  const [showReviewDialog, setShowReviewDialog] = useState(false);
   const [editingFaq, setEditingFaq] = useState<Partial<FaqItem> | null>(null);
+  const [editingShipping, setEditingShipping] = useState<Partial<ShippingCharge> | null>(null);
+  const [showShippingDialog, setShowShippingDialog] = useState(false);
 
   // Expanded orders tracker
   const [expandedOrders, setExpandedOrders] = useState<Record<string, boolean>>({});
@@ -157,6 +183,7 @@ export default function AdminDashboardPage() {
         siteContent: res.siteContent!,
         galleryItems: res.galleryItems || [],
         faqItems: res.faqItems || [],
+        shippingCharges: res.shippingCharges || [],
       });
       setIsLoggedIn(true);
       localStorage.setItem('khanfoods_admin_key', pwd);
@@ -206,7 +233,10 @@ export default function AdminDashboardPage() {
     }
 
     startTransition(async () => {
-      const res = await saveProductAction(password, editingProduct);
+      const res = await saveProductAction(password, {
+        ...editingProduct,
+        stock: editingProduct.stock ?? 999,
+      });
       if (res.success) {
         showToast(editingProduct.id ? 'Product updated successfully' : 'Product created successfully', 'success');
         setShowProductDialog(false);
@@ -287,6 +317,7 @@ export default function AdminDashboardPage() {
       if (res.success) {
         showToast('Gallery item saved', 'success');
         setEditingGallery(null);
+        setShowGalleryDialog(false);
         refreshAdminData(password);
       } else {
         showToast(res.error || 'Gallery save failed', 'error');
@@ -294,15 +325,36 @@ export default function AdminDashboardPage() {
     });
   };
 
-  const handleDeleteGallery = async (id: string) => {
-    if (!window.confirm('Delete this gallery item?')) return;
+  const handleDeleteGallery = async (id: string, title?: string) => {
+    if (!window.confirm(`"${title || 'এই আইটেম'}" গ্যালারি থেকে মুছে ফেলবেন?`)) return;
     const res = await deleteGalleryItemAction(password, id);
     if (res.success) {
-      showToast('Gallery item deleted', 'success');
+      showToast('গ্যালারি আইটেম মুছে ফেলা হয়েছে', 'success');
+      if (editingGallery?.id === id) {
+        setEditingGallery(null);
+        setShowGalleryDialog(false);
+      }
       refreshAdminData(password);
     } else {
       showToast(res.error || 'Delete failed', 'error');
     }
+  };
+
+  const openGalleryEditor = (item?: Partial<GalleryItem>) => {
+    if (item) {
+      setEditingGallery(item);
+    } else if (adminData) {
+      setEditingGallery({
+        title: '',
+        titleBn: '',
+        description: '',
+        descriptionBn: '',
+        image: '',
+        slot: 1,
+        sortOrder: adminData.galleryItems.length,
+      });
+    }
+    setShowGalleryDialog(true);
   };
 
   const handleSaveFaq = () => {
@@ -342,13 +394,13 @@ export default function AdminDashboardPage() {
   };
 
   const handleSaveReview = () => {
-    if (!editingReview?.id || !editingReview.name || !editingReview.text) {
-      showToast('Name and review text required', 'error');
+    if (!editingReview?.name || !editingReview.text) {
+      showToast('নাম ও রিভিউ টেক্সট দিন', 'error');
       return;
     }
     startTransition(async () => {
       const res = await saveReviewAction(password, {
-        id: editingReview.id!,
+        id: editingReview.id || '',
         name: editingReview.name!,
         rating: editingReview.rating ?? 5,
         text: editingReview.text!,
@@ -357,13 +409,103 @@ export default function AdminDashboardPage() {
         roleBn: editingReview.roleBn,
       });
       if (res.success) {
-        showToast('Review updated', 'success');
+        showToast(editingReview.id ? 'রিভিউ আপডেট হয়েছে' : 'নতুন রিভিউ যোগ হয়েছে', 'success');
         setEditingReview(null);
+        setShowReviewDialog(false);
         refreshAdminData(password);
       } else {
         showToast(res.error || 'Review save failed', 'error');
       }
     });
+  };
+
+  const handleDeleteReview = async (id: string, name?: string) => {
+    if (!window.confirm(`"${name || 'এই রিভিউ'}" মুছে ফেলবেন?`)) return;
+    startTransition(async () => {
+      const res = await deleteReviewAction(password, id);
+      if (res.success) {
+        showToast('রিভিউ মুছে ফেলা হয়েছে', 'success');
+        if (editingReview?.id === id) {
+          setEditingReview(null);
+          setShowReviewDialog(false);
+        }
+        refreshAdminData(password);
+      } else {
+        showToast(res.error || 'Failed to delete review', 'error');
+      }
+    });
+  };
+
+  const handleSaveShipping = () => {
+    if (!editingShipping?.name || editingShipping.fee === undefined) {
+      showToast('নাম ও চার্জ দিন', 'error');
+      return;
+    }
+
+    startTransition(async () => {
+      const res = await saveShippingChargeAction(password, {
+        id: editingShipping.id || '',
+        name: editingShipping.name!,
+        nameBn: editingShipping.nameBn,
+        fee: Number(editingShipping.fee),
+        sortOrder: editingShipping.sortOrder ?? 0,
+        active: editingShipping.active !== false,
+      });
+      if (res.success) {
+        showToast(editingShipping.id ? 'শিপিং চার্জ আপডেট হয়েছে' : 'নতুন শিপিং চার্জ যোগ হয়েছে', 'success');
+        setEditingShipping(null);
+        setShowShippingDialog(false);
+        refreshAdminData(password);
+      } else {
+        showToast(res.error || 'Save failed', 'error');
+      }
+    });
+  };
+
+  const handleDeleteShipping = async (id: string, name?: string) => {
+    if (!window.confirm(`"${name || 'এই চার্জ'}" মুছে ফেলবেন?`)) return;
+    const res = await deleteShippingChargeAction(password, id);
+    if (res.success) {
+      showToast('শিপিং চার্জ মুছে ফেলা হয়েছে', 'success');
+      if (editingShipping?.id === id) {
+        setEditingShipping(null);
+        setShowShippingDialog(false);
+      }
+      refreshAdminData(password);
+    } else {
+      showToast(res.error || 'Delete failed', 'error');
+    }
+  };
+
+  const openShippingEditor = (item?: Partial<ShippingCharge>) => {
+    if (item) {
+      setEditingShipping(item);
+    } else {
+      setEditingShipping({
+        name: '',
+        nameBn: '',
+        fee: 80,
+        sortOrder: adminData?.shippingCharges.length ?? 0,
+        active: true,
+      });
+    }
+    setShowShippingDialog(true);
+  };
+
+  const openReviewEditor = (item?: Partial<Review>) => {
+    if (item) {
+      setEditingReview(item);
+    } else {
+      setEditingReview({
+        name: '',
+        rating: 5,
+        text: '',
+        image: '',
+        role: '',
+        roleBn: '',
+      });
+    }
+    setShowReviewDialog(true);
   };
 
   // ORDER CHANGE STATUS 
@@ -593,6 +735,15 @@ export default function AdminDashboardPage() {
             </button>
 
             <button
+              onClick={() => setActiveTab('shipping')}
+              className={`w-full flex items-center gap-2.5 px-4 py-3 rounded-lg text-sm font-bold transition text-left cursor-pointer ${
+                activeTab === 'shipping' ? 'bg-[#1a234d] text-white' : 'text-stone-400 hover:bg-stone-800 hover:text-white'
+              }`}
+            >
+              <Truck className="w-4 h-4" /> Shipping Charges
+            </button>
+
+            <button
               onClick={() => setActiveTab('messages')}
               className={`w-full flex items-center gap-2.5 px-4 py-3 rounded-lg text-sm font-bold transition text-left cursor-pointer ${
                 activeTab === 'messages' ? 'bg-[#1a234d] text-white' : 'text-stone-400 hover:bg-stone-800 hover:text-white'
@@ -646,6 +797,7 @@ export default function AdminDashboardPage() {
               {activeTab === 'content' && 'Live Front-page Web Controls'}
               {activeTab === 'gallery' && 'Gallery Image Manager'}
               {activeTab === 'faq' && 'FAQ Content Manager'}
+              {activeTab === 'shipping' && 'Shipping Charge Manager'}
               {activeTab === 'messages' && 'Contact Inbox'}
               {activeTab === 'reviews' && 'Customer Review Moderation'}
             </h1>
@@ -690,8 +842,8 @@ export default function AdminDashboardPage() {
                   <ShoppingBag className="w-5 h-5 text-[#1a234d]" />
                 </div>
                 <span className="block text-2xl font-black text-stone-950">{totalProductsCount} Products</span>
-                <span className="text-[10px] text-[#1a234d] font-bold block mt-1 uppercase">
-                  {adminData.products.filter(p => p.stock < 10).length} warning stock out
+                <span className="text-[10px] text-stone-500 font-bold block mt-1 uppercase">
+                  Catalog Active
                 </span>
               </div>
 
@@ -772,7 +924,7 @@ export default function AdminDashboardPage() {
               <button
                 onClick={() => {
                   setEditingProduct({
-                    name: '', price: 0, discount: 0, description: '', category: adminData.categories[0]?.name || '', stock: 20, status: 'Active', image: ''
+                    name: '', price: 0, discount: 0, description: '', category: adminData.categories[0]?.name || '', stock: 999, status: 'Active', image: '', freeShipping: false
                   });
                   setShowProductDialog(true);
                 }}
@@ -793,7 +945,6 @@ export default function AdminDashboardPage() {
                       <th className="p-4">Category</th>
                       <th className="p-4 text-right">Raw Price</th>
                       <th className="p-4 text-right">Discount</th>
-                      <th className="p-4 text-right">In Stock</th>
                       <th className="p-4 text-center">Security Status</th>
                       <th className="p-4 pr-6 text-center">Actions</th>
                     </tr>
@@ -816,11 +967,6 @@ export default function AdminDashboardPage() {
                         <td className="p-4 text-xs font-bold text-stone-400">{p.category}</td>
                         <td className="p-4 text-right font-bold text-stone-800">{p.price.toLocaleString()} BDT</td>
                         <td className="p-4 text-right text-[#1a234d] font-extrabold">{p.discount}%</td>
-                        <td className="p-4 text-right">
-                          <span className={`font-mono text-xs font-black ${p.stock < 10 ? 'text-[#1a234d] animate-pulse' : 'text-stone-800'}`}>
-                            {p.stock}
-                          </span>
-                        </td>
                         <td className="p-4 text-center">
                           <span className={`inline-block text-[10px] uppercase tracking-widest font-black px-2.5 py-1 rounded-full ${
                             p.status === 'Active' ? 'bg-emerald-50 text-emerald-700' : 'bg-stone-100 text-stone-500'
@@ -1813,122 +1959,91 @@ export default function AdminDashboardPage() {
               <div>
                 <h3 className="font-serif text-3xl font-black text-stone-900">Gallery Manager</h3>
                 <p className="text-xs text-stone-400 font-bold uppercase tracking-widest mt-1">
-                  প্রাকৃতিক সৌন্দর্যের গ্যালারি — marquee slider images (add/edit items below)
+                  হোমপেজ গ্যালারি স্লাইডার — এডিট ও ডিলিট করুন
                 </p>
               </div>
               <button
                 type="button"
-                onClick={() =>
-                  setEditingGallery({
-                    title: '',
-                    titleBn: '',
-                    description: '',
-                    descriptionBn: '',
-                    image: '',
-                    slot: 1,
-                    sortOrder: adminData.galleryItems.length,
-                  })
-                }
-                className="bg-[#1a234d] text-white text-xs font-bold uppercase tracking-widest px-5 py-2.5 rounded-xl"
+                onClick={() => openGalleryEditor()}
+                className="bg-[#1a234d] hover:bg-black text-white text-xs font-bold uppercase tracking-widest px-5 py-2.5 rounded-xl flex items-center gap-1.5"
               >
-                Add Gallery Item
+                <PlusCircle className="w-4 h-4" /> নতুন গ্যালারি আইটেম
               </button>
             </div>
 
-            {editingGallery && (
-              <div className="bg-white border border-stone-100 rounded-2xl p-6 space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <input
-                    placeholder="Title (EN)"
-                    value={editingGallery.title || ''}
-                    onChange={(e) => setEditingGallery({ ...editingGallery, title: e.target.value })}
-                    className="border border-stone-200 rounded-lg px-3 py-2 text-sm"
-                  />
-                  <input
-                    placeholder="Title (BN)"
-                    value={editingGallery.titleBn || ''}
-                    onChange={(e) => setEditingGallery({ ...editingGallery, titleBn: e.target.value })}
-                    className="border border-stone-200 rounded-lg px-3 py-2 text-sm"
-                  />
-                  <textarea
-                    placeholder="Description (EN)"
-                    value={editingGallery.description || ''}
-                    onChange={(e) => setEditingGallery({ ...editingGallery, description: e.target.value })}
-                    className="border border-stone-200 rounded-lg px-3 py-2 text-sm md:col-span-2"
-                    rows={2}
-                  />
-                  <textarea
-                    placeholder="Description (BN)"
-                    value={editingGallery.descriptionBn || ''}
-                    onChange={(e) => setEditingGallery({ ...editingGallery, descriptionBn: e.target.value })}
-                    className="border border-stone-200 rounded-lg px-3 py-2 text-sm md:col-span-2"
-                    rows={2}
-                  />
-                  <select
-                    value={editingGallery.slot ?? 1}
-                    onChange={(e) => setEditingGallery({ ...editingGallery, slot: Number(e.target.value) })}
-                    className="border border-stone-200 rounded-lg px-3 py-2 text-sm"
-                  >
-                    <option value={1}>Slot 1 — Main (top)</option>
-                    <option value={2}>Slot 2 — Bottom left</option>
-                    <option value={3}>Slot 3 — Bottom right</option>
-                  </select>
-                  <input
-                    type="number"
-                    placeholder="Sort order"
-                    value={editingGallery.sortOrder ?? 0}
-                    onChange={(e) => setEditingGallery({ ...editingGallery, sortOrder: Number(e.target.value) })}
-                    className="border border-stone-200 rounded-lg px-3 py-2 text-sm"
-                  />
-                </div>
-                <div className="flex flex-wrap items-center gap-3">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) handleImageUpload(file, (url) => setEditingGallery({ ...editingGallery, image: url }));
-                    }}
-                    className="text-sm"
-                  />
-                  {editingGallery.image && (
-                    <div className="relative w-24 h-24 rounded-lg overflow-hidden border">
-                      <Image src={editingGallery.image} alt="" fill className="object-cover" />
-                    </div>
-                  )}
-                </div>
-                <div className="flex gap-2">
-                  <button type="button" onClick={handleSaveGallery} disabled={isPending} className="bg-[#1a234d] text-white px-5 py-2 rounded-lg text-sm font-bold">
-                    Save
-                  </button>
-                  <button type="button" onClick={() => setEditingGallery(null)} className="border px-5 py-2 rounded-lg text-sm">
-                    Cancel
-                  </button>
+            {adminData.galleryItems.length === 0 ? (
+              <div className="bg-white border border-dashed border-stone-200 rounded-2xl p-12 text-center">
+                <Images className="w-10 h-10 mx-auto text-stone-300 mb-3" />
+                <p className="font-bold text-stone-700">কোনো গ্যালারি আইটেম নেই</p>
+                <p className="text-sm text-stone-400 mt-1">উপরের বাটন দিয়ে নতুন ছবি যোগ করুন</p>
+              </div>
+            ) : (
+              <div className="bg-white border border-stone-100 rounded-2xl shadow-sm overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse text-sm">
+                    <thead>
+                      <tr className="bg-stone-50 text-stone-500 text-xs font-black uppercase tracking-wider border-b border-stone-100">
+                        <th className="p-4 pl-6">ছবি</th>
+                        <th className="p-4">শিরোনাম</th>
+                        <th className="p-4">বিবরণ</th>
+                        <th className="p-4 text-center">Slot</th>
+                        <th className="p-4 text-center">ক্রম</th>
+                        <th className="p-4 pr-6 text-center">অ্যাকশন</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-stone-100 text-stone-700">
+                      {adminData.galleryItems.map((item) => (
+                        <tr key={item.id} className="hover:bg-stone-50/50 transition duration-150">
+                          <td className="p-4 pl-6">
+                            <div className="relative w-16 h-16 bg-stone-50 border rounded-lg overflow-hidden">
+                              <Image
+                                src={item.image}
+                                alt={item.title}
+                                fill
+                                className="object-cover"
+                                referrerPolicy="no-referrer"
+                              />
+                            </div>
+                          </td>
+                          <td className="p-4 font-bold text-stone-900 max-w-[10rem]">
+                            {item.titleBn || item.title}
+                          </td>
+                          <td className="p-4 text-xs text-stone-500 max-w-xs line-clamp-2">
+                            {item.descriptionBn || item.description}
+                          </td>
+                          <td className="p-4 text-center">
+                            <span className="text-[10px] font-black uppercase tracking-wider bg-[#fef8f2] text-[#1a234d] px-2 py-1 rounded-full">
+                              Slot {item.slot}
+                            </span>
+                          </td>
+                          <td className="p-4 text-center font-mono text-xs font-bold">{item.sortOrder}</td>
+                          <td className="p-4 pr-6 text-center">
+                            <div className="flex items-center justify-center gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => openGalleryEditor(item)}
+                                className="p-2 hover:bg-blue-50 text-stone-600 hover:text-blue-600 rounded-lg transition"
+                                title="এডিট"
+                              >
+                                <Edit className="w-4 h-4" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteGallery(item.id, item.titleBn || item.title)}
+                                className="p-2 hover:bg-[#fef8f2] text-stone-600 hover:text-[#1a234d] rounded-lg transition"
+                                title="ডিলিট"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             )}
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {adminData.galleryItems.map((item) => (
-                <div key={item.id} className="bg-white border border-stone-100 rounded-2xl overflow-hidden">
-                  <div className="relative h-40">
-                    <Image src={item.image} alt={item.title} fill className="object-cover" referrerPolicy="no-referrer" />
-                  </div>
-                  <div className="p-4 space-y-2">
-                    <p className="font-bold text-sm">{item.titleBn || item.title}</p>
-                    <p className="text-xs text-stone-500">Slot {item.slot}</p>
-                    <div className="flex gap-2 pt-2">
-                      <button type="button" onClick={() => setEditingGallery(item)} className="text-xs font-bold text-[#1a234d]">
-                        Edit
-                      </button>
-                      <button type="button" onClick={() => handleDeleteGallery(item.id)} className="text-xs font-bold text-stone-400">
-                        Delete
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
           </div>
         )}
 
@@ -2028,6 +2143,94 @@ export default function AdminDashboardPage() {
           </div>
         )}
 
+        {/* SHIPPING CHARGES TAB */}
+        {activeTab === 'shipping' && adminData && (
+          <div className="space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h3 className="font-serif text-3xl font-black text-stone-900">Shipping Charge Manager</h3>
+                <p className="text-xs text-stone-400 font-bold uppercase tracking-widest mt-1">
+                  ডেলিভারি চার্জ তৈরি, এডিট, ডিলিট — চেকআউটে সব দেখাবে
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => openShippingEditor()}
+                className="bg-[#1a234d] hover:bg-black text-white text-xs font-bold uppercase tracking-widest px-5 py-2.5 rounded-xl flex items-center gap-1.5"
+              >
+                <PlusCircle className="w-4 h-4" /> নতুন শিপিং চার্জ
+              </button>
+            </div>
+
+            {adminData.shippingCharges.length === 0 ? (
+              <div className="bg-white border border-dashed border-stone-200 rounded-2xl p-12 text-center">
+                <Truck className="w-10 h-10 mx-auto text-stone-300 mb-3" />
+                <p className="font-bold text-stone-700">কোনো শিপিং চার্জ নেই</p>
+                <p className="text-sm text-stone-400 mt-1">যেমন: ঢাকার ভেতর ৮০, বাইরে ১৫০</p>
+              </div>
+            ) : (
+              <div className="bg-white border border-stone-100 rounded-2xl shadow-sm overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse text-sm">
+                    <thead>
+                      <tr className="bg-stone-50 text-stone-500 text-xs font-black uppercase tracking-wider border-b border-stone-100">
+                        <th className="p-4 pl-6">নাম</th>
+                        <th className="p-4 text-right">চার্জ (BDT)</th>
+                        <th className="p-4 text-center">ক্রম</th>
+                        <th className="p-4 text-center">স্ট্যাটাস</th>
+                        <th className="p-4 pr-6 text-center">অ্যাকশন</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-stone-100 text-stone-700">
+                      {adminData.shippingCharges.map((zone) => (
+                        <tr key={zone.id} className="hover:bg-stone-50/50 transition duration-150">
+                          <td className="p-4 pl-6">
+                            <p className="font-bold text-stone-900">{zone.nameBn || zone.name}</p>
+                            {zone.nameBn && <p className="text-xs text-stone-400">{zone.name}</p>}
+                          </td>
+                          <td className="p-4 text-right font-black text-[#1a234d]">
+                            {zone.fee.toLocaleString()} BDT
+                          </td>
+                          <td className="p-4 text-center font-mono text-xs">{zone.sortOrder}</td>
+                          <td className="p-4 text-center">
+                            <span
+                              className={`text-[10px] font-black uppercase px-2 py-1 rounded-full ${
+                                zone.active ? 'bg-emerald-50 text-emerald-700' : 'bg-stone-100 text-stone-500'
+                              }`}
+                            >
+                              {zone.active ? 'Active' : 'Off'}
+                            </span>
+                          </td>
+                          <td className="p-4 pr-6 text-center">
+                            <div className="flex items-center justify-center gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => openShippingEditor(zone)}
+                                className="p-2 hover:bg-blue-50 text-stone-600 hover:text-blue-600 rounded-lg transition"
+                                title="এডিট"
+                              >
+                                <Edit className="w-4 h-4" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteShipping(zone.id, zone.nameBn || zone.name)}
+                                className="p-2 hover:bg-[#fef8f2] text-stone-600 hover:text-[#1a234d] rounded-lg transition"
+                                title="ডিলিট"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* CONTACT MESSAGES TAB */}
         {activeTab === 'messages' && adminData && (
           <div className="space-y-6">
@@ -2086,165 +2289,103 @@ export default function AdminDashboardPage() {
         {/* CUSTOM REVIEWS TAB SECTION */}
         {activeTab === 'reviews' && adminData && (
           <div className="space-y-6">
-            <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
                 <h3 className="font-serif text-3xl font-black text-stone-900">Review Moderation</h3>
                 <p className="text-xs text-stone-400 font-bold uppercase tracking-widest mt-1">
-                  Edit customer review text & photo, or delete testimonials
+                  গ্রাহক রিভিউ তৈরি, এডিট ও ডিলিট করুন
                 </p>
               </div>
+              <button
+                type="button"
+                onClick={() => openReviewEditor()}
+                className="bg-[#1a234d] hover:bg-black text-white text-xs font-bold uppercase tracking-widest px-5 py-2.5 rounded-xl flex items-center gap-1.5"
+              >
+                <PlusCircle className="w-4 h-4" /> নতুন রিভিউ
+              </button>
             </div>
 
-            {editingReview && (
-              <div className="bg-white border border-stone-100 rounded-2xl p-6 space-y-4">
-                <h4 className="font-bold text-stone-900">Edit Review</h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <input
-                    placeholder="Customer name"
-                    value={editingReview.name || ''}
-                    onChange={(e) => setEditingReview({ ...editingReview, name: e.target.value })}
-                    className="border border-stone-200 rounded-lg px-3 py-2 text-sm"
-                  />
-                  <input
-                    type="number"
-                    min={1}
-                    max={5}
-                    placeholder="Rating 1-5"
-                    value={editingReview.rating ?? 5}
-                    onChange={(e) => setEditingReview({ ...editingReview, rating: Number(e.target.value) })}
-                    className="border border-stone-200 rounded-lg px-3 py-2 text-sm"
-                  />
-                  <textarea
-                    placeholder="Review text"
-                    value={editingReview.text || ''}
-                    onChange={(e) => setEditingReview({ ...editingReview, text: e.target.value })}
-                    className="border border-stone-200 rounded-lg px-3 py-2 text-sm md:col-span-2"
-                    rows={3}
-                  />
-                  <input
-                    placeholder="Photo URL"
-                    value={editingReview.image || ''}
-                    onChange={(e) => setEditingReview({ ...editingReview, image: e.target.value })}
-                    className="border border-stone-200 rounded-lg px-3 py-2 text-sm md:col-span-2"
-                  />
-                </div>
-                <div className="flex flex-wrap items-center gap-3">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) {
-                        handleImageUpload(file, (url) => setEditingReview({ ...editingReview, image: url }), 'review-edit');
-                      }
-                      e.target.value = '';
-                    }}
-                    className="text-xs"
-                  />
-                  {editingReview.image && (
-                    <div className="relative w-12 h-12 rounded-full overflow-hidden border border-stone-200">
-                      <Image src={editingReview.image} alt="" fill className="object-cover" referrerPolicy="no-referrer" />
-                    </div>
-                  )}
-                  <button
-                    type="button"
-                    onClick={handleSaveReview}
-                    disabled={isPending}
-                    className="bg-[#1a234d] text-white text-xs font-bold px-4 py-2 rounded-lg"
-                  >
-                    Save Review
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setEditingReview(null)}
-                    className="text-xs font-bold text-stone-500"
-                  >
-                    Cancel
-                  </button>
+            {adminData.reviews.length === 0 ? (
+              <div className="bg-white border border-dashed border-stone-200 rounded-2xl p-12 text-center">
+                <Star className="w-10 h-10 mx-auto text-amber-300 mb-3" />
+                <p className="font-bold text-stone-700">কোনো রিভিউ নেই</p>
+                <p className="text-sm text-stone-400 mt-1">উপরের বাটন দিয়ে নতুন রিভিউ যোগ করুন</p>
+              </div>
+            ) : (
+              <div className="bg-white border border-stone-100 rounded-2xl shadow-sm overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse text-sm">
+                    <thead>
+                      <tr className="bg-stone-50 text-stone-500 text-xs font-black uppercase tracking-wider border-b border-stone-100">
+                        <th className="p-4 pl-6">গ্রাহক</th>
+                        <th className="p-4">রেটিং</th>
+                        <th className="p-4">রিভিউ</th>
+                        <th className="p-4 pr-6 text-center">অ্যাকশন</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-stone-100 text-stone-700">
+                      {adminData.reviews.map((rev) => (
+                        <tr key={rev.id} className="hover:bg-stone-50/50 transition duration-150">
+                          <td className="p-4 pl-6">
+                            <div className="flex items-center gap-3">
+                              <div className="relative w-10 h-10 rounded-full overflow-hidden bg-stone-50 border shrink-0">
+                                <Image
+                                  src={rev.image || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=150'}
+                                  alt={rev.name}
+                                  fill
+                                  className="object-cover"
+                                  referrerPolicy="no-referrer"
+                                />
+                              </div>
+                              <div>
+                                <p className="font-bold text-stone-900">{rev.name}</p>
+                                {(rev.roleBn || rev.role) && (
+                                  <p className="text-[10px] text-stone-400">{rev.roleBn || rev.role}</p>
+                                )}
+                              </div>
+                            </div>
+                          </td>
+                          <td className="p-4">
+                            <div className="flex items-center gap-0.5">
+                              {Array.from({ length: 5 }).map((_, i) => (
+                                <Star
+                                  key={i}
+                                  className={`w-3.5 h-3.5 ${i < rev.rating ? 'text-amber-400 fill-amber-400' : 'text-stone-200'}`}
+                                />
+                              ))}
+                            </div>
+                          </td>
+                          <td className="p-4 text-xs text-stone-600 max-w-md line-clamp-2 italic">
+                            &ldquo;{rev.text}&rdquo;
+                          </td>
+                          <td className="p-4 pr-6 text-center">
+                            <div className="flex items-center justify-center gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => openReviewEditor(rev)}
+                                className="p-2 hover:bg-blue-50 text-stone-600 hover:text-blue-600 rounded-lg transition"
+                                title="এডিট"
+                              >
+                                <Edit className="w-4 h-4" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteReview(rev.id, rev.name)}
+                                disabled={isPending}
+                                className="p-2 hover:bg-[#fef8f2] text-stone-600 hover:text-[#1a234d] rounded-lg transition"
+                                title="ডিলিট"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             )}
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {adminData.reviews.length === 0 ? (
-                <div className="md:col-span-2 bg-white rounded-3xl border border-stone-100 p-12 text-center text-stone-400 font-bold">
-                  No verified customer testimonials submitted yet.
-                </div>
-              ) : (
-                adminData.reviews.map((rev) => (
-                  <div
-                    key={rev.id}
-                    className="bg-white rounded-3xl p-6 border border-stone-100 shadow-sm relative flex flex-col justify-between"
-                  >
-                    <div className="space-y-4">
-                      {/* Person header */}
-                      <div className="flex items-center gap-3">
-                        <div className="relative w-10 h-10 rounded-full overflow-hidden bg-stone-50 border border-stone-100">
-                          <Image
-                            src={rev.image || "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=150"}
-                            alt={rev.name}
-                            fill
-                            className="object-cover"
-                            referrerPolicy="no-referrer"
-                          />
-                        </div>
-                        <div>
-                          <h4 className="font-bold text-stone-900 text-sm leading-tight">{rev.name}</h4>
-                          <div className="flex items-center gap-0.5 mt-0.5">
-                            {Array.from({ length: 5 }).map((_, i) => (
-                              <Star
-                                key={i}
-                                className={`w-3.5 h-3.5 ${i < rev.rating ? 'text-amber-400 fill-amber-400' : 'text-stone-200'}`}
-                              />
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Comment text */}
-                      <p className="text-stone-600 text-sm italic leading-relaxed">
-                        &ldquo;{rev.text}&rdquo;
-                      </p>
-                    </div>
-
-                    {/* Footer operations */}
-                    <div className="mt-6 pt-4 border-t border-stone-50 flex items-center justify-between gap-2">
-                      <span className="text-[10px] text-stone-400 font-black uppercase tracking-widest truncate">
-                        ID: {rev.id}
-                      </span>
-                      <div className="flex items-center gap-3">
-                        <button
-                          type="button"
-                          onClick={() => setEditingReview({ ...rev })}
-                          className="flex items-center gap-1 hover:text-[#1a234d] text-stone-500 text-xs font-bold transition cursor-pointer"
-                        >
-                          <Edit className="w-3.5 h-3.5" /> Edit
-                        </button>
-                        <button
-                          onClick={() => {
-                          if (confirm('Are you absolutely sure you want to delete this customer review?')) {
-                            startTransition(async () => {
-                              const r = await deleteReviewAction(password, rev.id);
-                              if (r.success) {
-                                showToast('Review deleted successfully!', 'success');
-                                refreshAdminData(password);
-                              } else {
-                                showToast(r.error || 'Failed to delete review', 'error');
-                              }
-                            });
-                          }
-                        }}
-                        disabled={isPending}
-                        className="flex items-center gap-1 hover:text-[#1a234d] text-stone-400 text-xs font-bold transition cursor-pointer"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" /> Delete
-                      </button>
-                      </div>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
           </div>
         )}
       </main>
@@ -2314,37 +2455,39 @@ export default function AdminDashboardPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block uppercase font-bold tracking-widest text-stone-500 mb-1 leading-none">
-                      Shelf Category
-                    </label>
-                    <select
-                      required
-                      value={editingProduct.category || ''}
-                      onChange={(e) => setEditingProduct({ ...editingProduct, category: e.target.value })}
-                      className="w-full text-stone-800 bg-stone-50 border border-stone-200 text-sm px-4 py-3 rounded-xl focus:outline-none"
-                    >
-                      <option value="" disabled>-- Select Category (Required) --</option>
-                      {adminData && adminData.categories.map((c) => (
-                        <option key={c.id} value={c.name}>{c.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block uppercase font-bold tracking-widest text-stone-500 mb-1 leading-none">
-                      Total In Stock count
-                    </label>
-                    <input
-                      type="number"
-                      required
-                      placeholder="E.g., 40"
-                      value={editingProduct.stock === undefined ? '' : editingProduct.stock}
-                      onChange={(e) => setEditingProduct({ ...editingProduct, stock: Number(e.target.value) })}
-                      className="w-full text-[#111827] bg-stone-50 border border-stone-200 text-sm px-4 py-3 rounded-xl focus:outline-none"
-                    />
-                  </div>
+                <div>
+                  <label className="block uppercase font-bold tracking-widest text-stone-500 mb-1 leading-none">
+                    Shelf Category
+                  </label>
+                  <select
+                    required
+                    value={editingProduct.category || ''}
+                    onChange={(e) => setEditingProduct({ ...editingProduct, category: e.target.value })}
+                    className="w-full text-stone-800 bg-stone-50 border border-stone-200 text-sm px-4 py-3 rounded-xl focus:outline-none"
+                  >
+                    <option value="" disabled>-- Select Category (Required) --</option>
+                    {adminData && adminData.categories.map((c) => (
+                      <option key={c.id} value={c.name}>{c.name}</option>
+                    ))}
+                  </select>
                 </div>
+
+                <label className="flex items-start gap-3 p-4 border border-stone-200 rounded-xl bg-stone-50 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(editingProduct.freeShipping)}
+                    onChange={(e) =>
+                      setEditingProduct({ ...editingProduct, freeShipping: e.target.checked })
+                    }
+                    className="mt-1 rounded border-stone-300"
+                  />
+                  <span>
+                    <span className="block text-sm font-bold text-stone-900">ফ্রি ডেলিভারি (শিপিং চার্জ নেই)</span>
+                    <span className="block text-xs text-stone-500 mt-0.5">
+                      ডিফল্ট আনচেক — চেক করলে এই পণ্যে ডেলিভারি চার্জ লাগবে না
+                    </span>
+                  </span>
+                </label>
 
                 <div>
                   <div className="flex items-center justify-between mb-1">
@@ -2456,6 +2599,393 @@ export default function AdminDashboardPage() {
                   </button>
                 </div>
               </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* GALLERY EDIT / CREATE DIALOG */}
+      <AnimatePresence>
+        {showGalleryDialog && editingGallery && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => { setShowGalleryDialog(false); setEditingGallery(null); }}
+              className="absolute inset-0 bg-stone-900/60 backdrop-blur-sm"
+            />
+
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0, y: 30 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 30 }}
+              className="relative w-full max-w-lg bg-white rounded-3xl p-6 sm:p-8 shadow-2xl z-10 overflow-y-auto max-h-[90vh]"
+            >
+              <h3 className="font-serif text-2xl font-black mb-4 text-[#111827]">
+                {editingGallery.id ? 'গ্যালারি আইটেম এডিট' : 'নতুন গ্যালারি আইটেম'}
+              </h3>
+
+              <div className="space-y-4 text-sm">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[10px] uppercase font-bold tracking-widest text-stone-500 mb-1">
+                      Title (EN)
+                    </label>
+                    <input
+                      placeholder="Title (EN)"
+                      value={editingGallery.title || ''}
+                      onChange={(e) => setEditingGallery({ ...editingGallery, title: e.target.value })}
+                      className="w-full border border-stone-200 rounded-xl px-3 py-2.5 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] uppercase font-bold tracking-widest text-stone-500 mb-1">
+                      Title (BN)
+                    </label>
+                    <input
+                      placeholder="শিরোনাম (বাংলা)"
+                      value={editingGallery.titleBn || ''}
+                      onChange={(e) => setEditingGallery({ ...editingGallery, titleBn: e.target.value })}
+                      className="w-full border border-stone-200 rounded-xl px-3 py-2.5 text-sm"
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="block text-[10px] uppercase font-bold tracking-widest text-stone-500 mb-1">
+                      Description (EN)
+                    </label>
+                    <textarea
+                      placeholder="Description (EN)"
+                      value={editingGallery.description || ''}
+                      onChange={(e) => setEditingGallery({ ...editingGallery, description: e.target.value })}
+                      className="w-full border border-stone-200 rounded-xl px-3 py-2.5 text-sm"
+                      rows={2}
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="block text-[10px] uppercase font-bold tracking-widest text-stone-500 mb-1">
+                      Description (BN)
+                    </label>
+                    <textarea
+                      placeholder="বিবরণ (বাংলা)"
+                      value={editingGallery.descriptionBn || ''}
+                      onChange={(e) => setEditingGallery({ ...editingGallery, descriptionBn: e.target.value })}
+                      className="w-full border border-stone-200 rounded-xl px-3 py-2.5 text-sm"
+                      rows={2}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] uppercase font-bold tracking-widest text-stone-500 mb-1">
+                      Slot
+                    </label>
+                    <select
+                      value={editingGallery.slot ?? 1}
+                      onChange={(e) => setEditingGallery({ ...editingGallery, slot: Number(e.target.value) })}
+                      className="w-full border border-stone-200 rounded-xl px-3 py-2.5 text-sm"
+                    >
+                      <option value={1}>Slot 1 — Main</option>
+                      <option value={2}>Slot 2 — Bottom left</option>
+                      <option value={3}>Slot 3 — Bottom right</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] uppercase font-bold tracking-widest text-stone-500 mb-1">
+                      Sort order
+                    </label>
+                    <input
+                      type="number"
+                      placeholder="Sort order"
+                      value={editingGallery.sortOrder ?? 0}
+                      onChange={(e) => setEditingGallery({ ...editingGallery, sortOrder: Number(e.target.value) })}
+                      className="w-full border border-stone-200 rounded-xl px-3 py-2.5 text-sm"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2 p-3 bg-stone-50 border border-stone-200 rounded-2xl">
+                  <label className="block text-[10px] uppercase font-bold tracking-widest text-stone-500">
+                    Image URL
+                  </label>
+                  <input
+                    type="url"
+                    placeholder="https://..."
+                    value={editingGallery.image || ''}
+                    onChange={(e) => setEditingGallery({ ...editingGallery, image: e.target.value })}
+                    className="w-full text-stone-800 bg-white border border-stone-200 text-xs px-3 py-2 rounded-lg"
+                  />
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handleImageUpload(file, (url) => setEditingGallery({ ...editingGallery, image: url }));
+                    }}
+                    className="text-xs w-full"
+                  />
+                  {editingGallery.image && (
+                    <div className="relative w-full h-36 rounded-xl overflow-hidden border">
+                      <Image src={editingGallery.image} alt="" fill className="object-cover" referrerPolicy="no-referrer" />
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => { setShowGalleryDialog(false); setEditingGallery(null); }}
+                    className="flex-1 py-3 border rounded-xl hover:bg-stone-50 transition font-bold text-sm"
+                  >
+                    বাতিল
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSaveGallery}
+                    disabled={isPending}
+                    className="flex-1 py-3 bg-[#1a234d] hover:bg-black text-white rounded-xl transition font-bold text-sm"
+                  >
+                    {isPending ? 'সেভ হচ্ছে...' : 'সেভ করুন'}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* SHIPPING EDIT / CREATE DIALOG */}
+      <AnimatePresence>
+        {showShippingDialog && editingShipping && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => { setShowShippingDialog(false); setEditingShipping(null); }}
+              className="absolute inset-0 bg-stone-900/60 backdrop-blur-sm"
+            />
+
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0, y: 30 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 30 }}
+              className="relative w-full max-w-md bg-white rounded-3xl p-6 sm:p-8 shadow-2xl z-10"
+            >
+              <h3 className="font-serif text-2xl font-black mb-4 text-[#111827]">
+                {editingShipping.id ? 'শিপিং চার্জ এডিট' : 'নতুন শিপিং চার্জ'}
+              </h3>
+
+              <div className="space-y-4 text-sm">
+                <div>
+                  <label className="block text-[10px] uppercase font-bold tracking-widest text-stone-500 mb-1">
+                    Name (EN)
+                  </label>
+                  <input
+                    placeholder="Inside Dhaka"
+                    value={editingShipping.name || ''}
+                    onChange={(e) => setEditingShipping({ ...editingShipping, name: e.target.value })}
+                    className="w-full border border-stone-200 rounded-xl px-3 py-2.5"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] uppercase font-bold tracking-widest text-stone-500 mb-1">
+                    Name (BN)
+                  </label>
+                  <input
+                    placeholder="ঢাকার ভেতর"
+                    value={editingShipping.nameBn || ''}
+                    onChange={(e) => setEditingShipping({ ...editingShipping, nameBn: e.target.value })}
+                    className="w-full border border-stone-200 rounded-xl px-3 py-2.5"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[10px] uppercase font-bold tracking-widest text-stone-500 mb-1">
+                      Fee (BDT)
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={editingShipping.fee ?? ''}
+                      onChange={(e) => setEditingShipping({ ...editingShipping, fee: Number(e.target.value) })}
+                      className="w-full border border-stone-200 rounded-xl px-3 py-2.5"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] uppercase font-bold tracking-widest text-stone-500 mb-1">
+                      Sort order
+                    </label>
+                    <input
+                      type="number"
+                      value={editingShipping.sortOrder ?? 0}
+                      onChange={(e) => setEditingShipping({ ...editingShipping, sortOrder: Number(e.target.value) })}
+                      className="w-full border border-stone-200 rounded-xl px-3 py-2.5"
+                    />
+                  </div>
+                </div>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={editingShipping.active !== false}
+                    onChange={(e) => setEditingShipping({ ...editingShipping, active: e.target.checked })}
+                  />
+                  <span className="text-sm font-semibold">চেকআউটে দেখাবে (Active)</span>
+                </label>
+
+                <div className="flex gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => { setShowShippingDialog(false); setEditingShipping(null); }}
+                    className="flex-1 py-3 border rounded-xl hover:bg-stone-50 font-bold"
+                  >
+                    বাতিল
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSaveShipping}
+                    disabled={isPending}
+                    className="flex-1 py-3 bg-[#1a234d] hover:bg-black text-white rounded-xl font-bold"
+                  >
+                    {isPending ? 'সেভ...' : 'সেভ করুন'}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* REVIEW EDIT / CREATE DIALOG */}
+      <AnimatePresence>
+        {showReviewDialog && editingReview && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => { setShowReviewDialog(false); setEditingReview(null); }}
+              className="absolute inset-0 bg-stone-900/60 backdrop-blur-sm"
+            />
+
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0, y: 30 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 30 }}
+              className="relative w-full max-w-lg bg-white rounded-3xl p-6 sm:p-8 shadow-2xl z-10 overflow-y-auto max-h-[90vh]"
+            >
+              <h3 className="font-serif text-2xl font-black mb-4 text-[#111827]">
+                {editingReview.id ? 'রিভিউ এডিট' : 'নতুন রিভিউ যোগ করুন'}
+              </h3>
+
+              <div className="space-y-4 text-sm">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[10px] uppercase font-bold tracking-widest text-stone-500 mb-1">
+                      গ্রাহকের নাম
+                    </label>
+                    <input
+                      placeholder="যেমন: রহিম আহমেদ"
+                      value={editingReview.name || ''}
+                      onChange={(e) => setEditingReview({ ...editingReview, name: e.target.value })}
+                      className="w-full border border-stone-200 rounded-xl px-3 py-2.5 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] uppercase font-bold tracking-widest text-stone-500 mb-1">
+                      রেটিং (১–৫)
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={5}
+                      value={editingReview.rating ?? 5}
+                      onChange={(e) => setEditingReview({ ...editingReview, rating: Number(e.target.value) })}
+                      className="w-full border border-stone-200 rounded-xl px-3 py-2.5 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] uppercase font-bold tracking-widest text-stone-500 mb-1">
+                      Role (EN)
+                    </label>
+                    <input
+                      placeholder="Verified Buyer"
+                      value={editingReview.role || ''}
+                      onChange={(e) => setEditingReview({ ...editingReview, role: e.target.value })}
+                      className="w-full border border-stone-200 rounded-xl px-3 py-2.5 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] uppercase font-bold tracking-widest text-stone-500 mb-1">
+                      Role (BN)
+                    </label>
+                    <input
+                      placeholder="যাচাইকৃত ক্রেতা"
+                      value={editingReview.roleBn || ''}
+                      onChange={(e) => setEditingReview({ ...editingReview, roleBn: e.target.value })}
+                      className="w-full border border-stone-200 rounded-xl px-3 py-2.5 text-sm"
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="block text-[10px] uppercase font-bold tracking-widest text-stone-500 mb-1">
+                      রিভিউ টেক্সট
+                    </label>
+                    <textarea
+                      placeholder="গ্রাহকের অভিজ্ঞতা লিখুন..."
+                      value={editingReview.text || ''}
+                      onChange={(e) => setEditingReview({ ...editingReview, text: e.target.value })}
+                      className="w-full border border-stone-200 rounded-xl px-3 py-2.5 text-sm"
+                      rows={4}
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2 p-3 bg-stone-50 border border-stone-200 rounded-2xl">
+                  <label className="block text-[10px] uppercase font-bold tracking-widest text-stone-500">
+                    প্রোফাইল ছবি
+                  </label>
+                  <input
+                    type="url"
+                    placeholder="https://..."
+                    value={editingReview.image || ''}
+                    onChange={(e) => setEditingReview({ ...editingReview, image: e.target.value })}
+                    className="w-full text-stone-800 bg-white border border-stone-200 text-xs px-3 py-2 rounded-lg"
+                  />
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        handleImageUpload(file, (url) => setEditingReview({ ...editingReview, image: url }), 'review-edit');
+                      }
+                      e.target.value = '';
+                    }}
+                    className="text-xs w-full"
+                  />
+                  {editingReview.image && (
+                    <div className="relative w-16 h-16 rounded-full overflow-hidden border mx-auto">
+                      <Image src={editingReview.image} alt="" fill className="object-cover" referrerPolicy="no-referrer" />
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => { setShowReviewDialog(false); setEditingReview(null); }}
+                    className="flex-1 py-3 border rounded-xl hover:bg-stone-50 transition font-bold text-sm"
+                  >
+                    বাতিল
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSaveReview}
+                    disabled={isPending}
+                    className="flex-1 py-3 bg-[#1a234d] hover:bg-black text-white rounded-xl transition font-bold text-sm"
+                  >
+                    {isPending ? 'সেভ হচ্ছে...' : 'সেভ করুন'}
+                  </button>
+                </div>
+              </div>
             </motion.div>
           </div>
         )}

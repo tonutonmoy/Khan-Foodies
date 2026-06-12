@@ -29,7 +29,6 @@ export function ProductCard({
   const tags: string[] = [];
   if (product.discount > 0) tags.push(`${t.savePercent} ${product.discount}%`);
   if (product.rating >= 4) tags.push(`${product.rating.toFixed(1)} ★`);
-  if (product.stock > 0 && product.stock <= 10) tags.push(`${product.stock} ${t.unitsLeft}`);
 
   const priceLabel =
     product.discount > 0 ? (
@@ -102,10 +101,6 @@ export function ProductCard({
           {isOutOfStock ? t.outOfStock : t.addToCartFull}
         </GlowButton>
       </div>
-
-      <p className={`pc-stock ${isOutOfStock ? 'pc-stock--out' : ''}`}>
-        {isOutOfStock ? t.outOfStock : `${t.unitsLeft}: ${product.stock}`}
-      </p>
     </section>
   );
 }
