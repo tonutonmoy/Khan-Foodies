@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useTransition, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useTransition, useRef, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   LayoutDashboard,
@@ -31,6 +31,7 @@ import {
   MessageSquare,
   Truck,
   Menu,
+  Search,
 } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -122,8 +123,10 @@ export default function AdminDashboardPage() {
   const [editingShipping, setEditingShipping] = useState<Partial<ShippingCharge> | null>(null);
   const [showShippingDialog, setShowShippingDialog] = useState(false);
 
-  // Expanded orders tracker
-  const [expandedOrders, setExpandedOrders] = useState<Record<string, boolean>>({});
+  // Order view / filter
+  const [viewingOrder, setViewingOrder] = useState<Order | null>(null);
+  const [orderDateFilter, setOrderDateFilter] = useState<'all' | 'today' | 'yesterday'>('all');
+  const [orderSearchQuery, setOrderSearchQuery] = useState('');
 
   // Status for Custom Toaster
   const [toasts, setToasts] = useState<Array<{ id: number; message: string; type: 'success' | 'error' }>>([]);
@@ -632,6 +635,39 @@ export default function AdminDashboardPage() {
   const totalProductsCount = adminData?.products.length || 0;
   const totalCategoriesCount = adminData?.categories.length || 0;
   const totalOrdersCount = adminData?.orders.length || 0;
+
+  const isSameCalendarDay = (a: Date, b: Date) =>
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate();
+
+  const filteredOrders = useMemo(() => {
+    if (!adminData) return [];
+    let list = adminData.orders;
+
+    if (orderDateFilter === 'today') {
+      const now = new Date();
+      list = list.filter((o) => o.createdAt && isSameCalendarDay(new Date(o.createdAt), now));
+    } else if (orderDateFilter === 'yesterday') {
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      list = list.filter((o) => o.createdAt && isSameCalendarDay(new Date(o.createdAt), yesterday));
+    }
+
+    const q = orderSearchQuery.trim().toLowerCase();
+    if (q) {
+      list = list.filter(
+        (o) =>
+          o.orderNumber.toLowerCase().includes(q) ||
+          o.customerName.toLowerCase().includes(q) ||
+          o.phone.includes(q) ||
+          o.address.toLowerCase().includes(q) ||
+          (o.email?.toLowerCase().includes(q) ?? false)
+      );
+    }
+
+    return list;
+  }, [adminData, orderDateFilter, orderSearchQuery]);
 
   if (!isLoggedIn) {
     return (
@@ -1174,18 +1210,57 @@ export default function AdminDashboardPage() {
         {/* ORDER RECORDS */}
         {activeTab === 'orders' && adminData && (
           <div className="space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2">
+            <div className="flex flex-col gap-4 pb-2">
               <div>
                 <h3 className="font-serif text-2xl font-black text-stone-900">Secure COD Shipping Orders</h3>
                 <p className="text-xs text-stone-400 font-bold uppercase tracking-widest mt-0.5">
                   Real-time database records of raw food seekers of Bangladesh
                 </p>
               </div>
+
+              <div className="flex flex-col lg:flex-row gap-3 lg:items-center lg:justify-between">
+                <div className="relative flex-1 max-w-md">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400 pointer-events-none" />
+                  <input
+                    type="search"
+                    placeholder="Search order, name, phone, email..."
+                    value={orderSearchQuery}
+                    onChange={(e) => setOrderSearchQuery(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2.5 bg-white border border-stone-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1a234d]/15 focus:border-[#1a234d]"
+                  />
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {(
+                    [
+                      ['all', 'All'],
+                      ['today', 'Today'],
+                      ['yesterday', 'Yesterday'],
+                    ] as const
+                  ).map(([key, label]) => (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => setOrderDateFilter(key)}
+                      className={`px-4 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition ${
+                        orderDateFilter === key
+                          ? 'bg-[#1a234d] text-white shadow-md'
+                          : 'bg-white border border-stone-200 text-stone-600 hover:border-[#1a234d]/30'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
 
             {adminData.orders.length === 0 ? (
               <div className="bg-white border border-stone-100 rounded-3xl p-12 text-center text-stone-400 font-bold">
                 No e-commerce orders recorded in system database.
+              </div>
+            ) : filteredOrders.length === 0 ? (
+              <div className="bg-white border border-stone-100 rounded-3xl p-12 text-center text-stone-400 font-bold">
+                No orders match your filter or search.
               </div>
             ) : (
               <div className="bg-white border border-stone-100 rounded-3xl shadow-sm overflow-hidden">
@@ -1202,118 +1277,72 @@ export default function AdminDashboardPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-stone-100 text-stone-700">
-                      {adminData.orders.map((o) => {
-                        const isExpanded = !!expandedOrders[o.id];
-                        const dateString = o.createdAt ? new Date(o.createdAt).toLocaleDateString() : 'N/A';
-                        
+                      {filteredOrders.map((o) => {
+                        const dateString = o.createdAt
+                          ? new Date(o.createdAt).toLocaleString()
+                          : 'N/A';
+
                         return (
-                          <React.Fragment key={o.id}>
-                            <tr className={`hover:bg-stone-50/50 transition duration-150 ${isExpanded ? 'bg-stone-50/30' : ''}`}>
-                              <td className="p-4 pl-6">
-                                <span className="font-mono text-xs font-black text-stone-950 block">{o.orderNumber}</span>
-                                <span className="text-[10px] text-stone-400 font-semibold">{dateString}</span>
-                              </td>
-                              <td className="p-4">
-                                <span className="font-bold text-stone-900 block">{o.customerName}</span>
-                                <span className="text-[10px] font-mono text-stone-500 flex items-center gap-1 mt-0.5">
-                                  {o.phone}
+                          <tr key={o.id} className="hover:bg-stone-50/50 transition duration-150">
+                            <td className="p-4 pl-6">
+                              <span className="font-mono text-xs font-black text-stone-950 block">{o.orderNumber}</span>
+                              <span className="text-[10px] text-stone-400 font-semibold">{dateString}</span>
+                            </td>
+                            <td className="p-4">
+                              <span className="font-bold text-stone-900 block">{o.customerName}</span>
+                              <span className="text-[10px] font-mono text-stone-500 flex items-center gap-1 mt-0.5">
+                                {o.phone}
+                              </span>
+                              {o.email && (
+                                <span className="text-[10px] text-stone-400 block mt-0.5 truncate max-w-[180px]">
+                                  {o.email}
                                 </span>
-                              </td>
-                              <td className="p-4 font-medium text-stone-600 max-w-xs truncate" title={o.address}>
-                                {o.address}
-                              </td>
-                              <td className="p-4 text-right font-black text-[#1a234d] text-xs sm:text-sm">
-                                {o.amount.toLocaleString()} BDT
-                              </td>
-                              <td className="p-4 text-center">
-                                <select
-                                  value={o.status || 'Pending'}
-                                  onChange={(e) => handleUpdateOrderStatus(o.id, e.target.value as Order['status'])}
-                                  className={`bg-stone-50 border text-[10px] font-black uppercase tracking-wider px-2.5 py-1.5 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#1a234d]/20 cursor-pointer ${
-                                    o.status === 'Delivered' ? 'border-emerald-200 text-emerald-700 bg-emerald-50/50' :
-                                    o.status === 'Cancelled' ? 'border-stone-200 text-stone-400 bg-stone-50' :
-                                    o.status === 'Shipped' ? 'border-blue-200 text-blue-700 bg-blue-50/50' :
-                                    o.status === 'Processing' ? 'border-amber-200 text-amber-700 bg-amber-50/50' :
-                                    'border-[#f5b075]/50 text-[#1a234d] bg-[#fef8f2]'
-                                  }`}
+                              )}
+                            </td>
+                            <td className="p-4 font-medium text-stone-600 max-w-xs truncate" title={o.address}>
+                              {o.address}
+                            </td>
+                            <td className="p-4 text-right font-black text-[#1a234d] text-xs sm:text-sm">
+                              {o.amount.toLocaleString()} BDT
+                            </td>
+                            <td className="p-4 text-center">
+                              <select
+                                value={o.status || 'Pending'}
+                                onChange={(e) => handleUpdateOrderStatus(o.id, e.target.value as Order['status'])}
+                                className={`bg-stone-50 border text-[10px] font-black uppercase tracking-wider px-2.5 py-1.5 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#1a234d]/20 cursor-pointer ${
+                                  o.status === 'Delivered' ? 'border-emerald-200 text-emerald-700 bg-emerald-50/50' :
+                                  o.status === 'Cancelled' ? 'border-stone-200 text-stone-400 bg-stone-50' :
+                                  o.status === 'Shipped' ? 'border-blue-200 text-blue-700 bg-blue-50/50' :
+                                  o.status === 'Processing' ? 'border-amber-200 text-amber-700 bg-amber-50/50' :
+                                  'border-[#f5b075]/50 text-[#1a234d] bg-[#fef8f2]'
+                                }`}
+                              >
+                                <option value="Pending">Pending</option>
+                                <option value="Processing">Processing</option>
+                                <option value="Shipped">Shipped</option>
+                                <option value="Delivered">Delivered</option>
+                                <option value="Cancelled">Cancelled</option>
+                              </select>
+                            </td>
+                            <td className="p-4 pr-6 text-center">
+                              <div className="flex items-center justify-center gap-1.5">
+                                <button
+                                  onClick={() => setViewingOrder(o)}
+                                  className="p-2 rounded-lg hover:bg-stone-100 text-stone-600 transition-all"
+                                  title="View order details"
                                 >
-                                  <option value="Pending">Pending</option>
-                                  <option value="Processing">Processing</option>
-                                  <option value="Shipped">Shipped</option>
-                                  <option value="Delivered">Delivered</option>
-                                  <option value="Cancelled">Cancelled</option>
-                                </select>
-                              </td>
-                              <td className="p-4 pr-6 text-center">
-                                <div className="flex items-center justify-center gap-1.5">
-                                  <button
-                                    onClick={() => setExpandedOrders(prev => ({ ...prev, [o.id]: !isExpanded }))}
-                                    className={`p-2 rounded-lg transition-all ${isExpanded ? 'bg-stone-200 text-stone-800' : 'hover:bg-stone-100 text-stone-600'}`}
-                                    title="Toggle item details"
-                                  >
-                                    <Eye className="w-4 h-4" />
-                                  </button>
-                                  <button
-                                    onClick={() => handleDeleteOrder(o.id, o.orderNumber)}
-                                    className="p-2 hover:bg-[#fef8f2] text-stone-600 hover:text-[#1a234d] rounded-lg transition"
-                                    title="Delete Order record"
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </button>
-                                </div>
-                              </td>
-                            </tr>
-                            
-                            {/* Expanded Sub-Row */}
-                            {isExpanded && (
-                              <tr className="bg-stone-50/20">
-                                <td colSpan={6} className="p-6 border-b border-stone-100">
-                                  <motion.div
-                                    initial={{ opacity: 0, y: -5 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    className="space-y-4 max-w-4xl mx-auto"
-                                  >
-                                    <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
-                                      {/* Delivery instructions */}
-                                      <div className="md:col-span-4 p-4 rounded-xl bg-white border border-stone-100 space-y-2 text-xs">
-                                        <h4 className="text-[10px] font-black uppercase text-stone-400 tracking-wider">Shipping Details</h4>
-                                        <p className="text-stone-900 font-bold">{o.customerName}</p>
-                                        <p className="text-stone-600">{o.address}</p>
-                                        <p className="text-stone-600 font-medium">Phone: {o.phone}</p>
-                                        {o.notes && (
-                                          <div className="pt-2 border-t mt-2">
-                                            <span className="text-[9px] font-black uppercase text-[#f5b075] tracking-widest block">Customer Notes</span>
-                                            <p className="text-xs text-stone-700 italic mt-0.5 bg-[#fef8f2]/30 p-2 border border-[#f5b075]/40 rounded-lg">{o.notes}</p>
-                                          </div>
-                                        )}
-                                      </div>
-
-                                      {/* Order items invoice */}
-                                      <div className="md:col-span-8 p-4 rounded-xl bg-white border border-stone-100 space-y-4 text-xs">
-                                        <h4 className="text-[10px] font-black uppercase text-stone-400 tracking-wider">Itemized Breakdown</h4>
-                                        <div className="divide-y divide-stone-100 text-stone-700">
-                                          {o.items.map((item, idx) => (
-                                            <div key={idx} className="py-2.5 flex justify-between items-center">
-                                              <div>
-                                                <span className="font-bold text-stone-900 text-xs sm:text-sm">{item.name}</span>
-                                                <span className="text-stone-400 text-[10px] font-medium block mt-0.5">Quantity items bought: x{item.quantity} × {item.price.toLocaleString()} BDT</span>
-                                              </div>
-                                              <span className="font-bold text-stone-900">{(item.price * item.quantity).toLocaleString()} BDT</span>
-                                            </div>
-                                          ))}
-                                        </div>
-
-                                        <div className="pt-3 border-t border-stone-100 flex justify-between items-center font-black text-xs sm:text-sm text-stone-950 font-sans">
-                                          <span>Cumulative Invoice Total</span>
-                                          <span className="text-[#1a234d] text-base font-black">{o.amount.toLocaleString()} BDT</span>
-                                        </div>
-                                      </div>
-                                    </div>
-                                  </motion.div>
-                                </td>
-                              </tr>
-                            )}
-                          </React.Fragment>
+                                  <Eye className="w-4 h-4" />
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteOrder(o.id, o.orderNumber)}
+                                  className="p-2 hover:bg-[#fef8f2] text-stone-600 hover:text-[#1a234d] rounded-lg transition"
+                                  title="Delete Order record"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
                         );
                       })}
                     </tbody>
@@ -2400,6 +2429,117 @@ export default function AdminDashboardPage() {
         )}
       </main>
       </div>
+
+      {/* ORDER DETAIL MODAL */}
+      <AnimatePresence>
+        {viewingOrder && (
+          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setViewingOrder(null)}
+              className="absolute inset-0 bg-stone-900/60 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0, y: 24 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 24 }}
+              className="relative w-full max-w-2xl bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl z-10 overflow-y-auto max-h-[92vh] sm:max-h-[90vh]"
+            >
+              <div className="sticky top-0 bg-white border-b border-stone-100 px-5 sm:px-6 py-4 flex items-start justify-between gap-3">
+                <div>
+                  <span className="text-[10px] font-black uppercase tracking-widest text-[#1a234d]">Order Details</span>
+                  <h3 className="font-mono text-lg font-black text-stone-900">{viewingOrder.orderNumber}</h3>
+                  <p className="text-[10px] text-stone-400 mt-0.5">
+                    {viewingOrder.createdAt ? new Date(viewingOrder.createdAt).toLocaleString() : 'N/A'}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setViewingOrder(null)}
+                  className="p-2 rounded-lg hover:bg-stone-100 text-stone-600 shrink-0"
+                  aria-label="Close"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="p-5 sm:p-6 space-y-5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="p-4 rounded-xl bg-stone-50 border border-stone-100 space-y-2 text-sm">
+                    <h4 className="text-[10px] font-black uppercase text-stone-400 tracking-wider">Customer</h4>
+                    <p className="font-bold text-stone-900">{viewingOrder.customerName}</p>
+                    <p className="text-stone-600 font-mono text-xs">{viewingOrder.phone}</p>
+                    {viewingOrder.email && (
+                      <p className="text-stone-500 text-xs break-all">{viewingOrder.email}</p>
+                    )}
+                  </div>
+                  <div className="p-4 rounded-xl bg-stone-50 border border-stone-100 space-y-2 text-sm">
+                    <h4 className="text-[10px] font-black uppercase text-stone-400 tracking-wider">Status</h4>
+                    <select
+                      value={
+                        adminData?.orders.find((x) => x.id === viewingOrder.id)?.status ||
+                        viewingOrder.status ||
+                        'Pending'
+                      }
+                      onChange={(e) => {
+                        const status = e.target.value as Order['status'];
+                        void handleUpdateOrderStatus(viewingOrder.id, status);
+                        setViewingOrder((prev) => (prev ? { ...prev, status } : prev));
+                      }}
+                      className="w-full bg-white border border-stone-200 text-xs font-black uppercase px-3 py-2 rounded-lg"
+                    >
+                      <option value="Pending">Pending</option>
+                      <option value="Processing">Processing</option>
+                      <option value="Shipped">Shipped</option>
+                      <option value="Delivered">Delivered</option>
+                      <option value="Cancelled">Cancelled</option>
+                    </select>
+                    <p className="text-[#1a234d] font-black text-lg">{viewingOrder.amount.toLocaleString()} BDT</p>
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-xl border border-stone-100 space-y-2 text-sm">
+                  <h4 className="text-[10px] font-black uppercase text-stone-400 tracking-wider">Delivery Address</h4>
+                  <p className="text-stone-700">{viewingOrder.address}</p>
+                  {viewingOrder.notes && (
+                    <div className="pt-2 border-t mt-2">
+                      <span className="text-[9px] font-black uppercase text-[#f5b075] tracking-widest block">Notes</span>
+                      <p className="text-xs text-stone-600 mt-1 bg-[#fef8f2]/40 p-3 rounded-lg border border-[#f5b075]/30">
+                        {viewingOrder.notes}
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                <div className="p-4 rounded-xl border border-stone-100">
+                  <h4 className="text-[10px] font-black uppercase text-stone-400 tracking-wider mb-3">Items</h4>
+                  <div className="divide-y divide-stone-100">
+                    {viewingOrder.items.map((item, idx) => (
+                      <div key={idx} className="py-3 flex justify-between gap-3 items-start">
+                        <div className="min-w-0">
+                          <p className="font-bold text-stone-900 text-sm">{item.name}</p>
+                          <p className="text-[10px] text-stone-400 mt-0.5">
+                            ×{item.quantity} @ {item.price.toLocaleString()} BDT
+                          </p>
+                        </div>
+                        <span className="font-black text-stone-900 shrink-0">
+                          {(item.price * item.quantity).toLocaleString()} BDT
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="pt-3 mt-2 border-t flex justify-between font-black text-[#1a234d]">
+                    <span>Total</span>
+                    <span>{viewingOrder.amount.toLocaleString()} BDT</span>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* CREATOR DIALOG DICTIONARY: PRODUCT */}
       <AnimatePresence>

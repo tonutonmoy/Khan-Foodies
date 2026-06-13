@@ -42,6 +42,7 @@ model Order {
   orderNumber  String      @unique
   customerName String
   phone        String
+  email        String?
   address      String
   items        OrderItem[]
   amount       Float

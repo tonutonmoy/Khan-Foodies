@@ -58,9 +58,23 @@ declare global {
 export function trackMetaBrowserEvent(
   eventName: string,
   customData: MetaCustomData,
-  eventId: string
+  eventId: string,
+  user?: { email?: string; phone?: string }
 ): void {
   if (typeof window === 'undefined' || typeof window.fbq !== 'function') return;
+
+  const pixelId = process.env.NEXT_PUBLIC_META_PIXEL_ID;
+  if (pixelId && user) {
+    const initData: Record<string, string> = {};
+    const email = user.email?.trim().toLowerCase();
+    if (email) initData.em = email;
+    const phone = user.phone?.replace(/\D/g, '');
+    if (phone) initData.ph = phone;
+    if (Object.keys(initData).length > 0) {
+      window.fbq!('init', pixelId, initData);
+    }
+  }
+
   window.fbq('track', eventName, customData, { eventID: eventId });
 }
 

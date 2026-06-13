@@ -180,6 +180,7 @@ export default function StorefrontPage() {
   const [checkoutForm, setCheckoutForm] = useState({
     name: '',
     phone: '',
+    email: '',
     address: '',
     notes: '',
     deliveryZone: '',
@@ -414,13 +415,27 @@ export default function StorefrontPage() {
     startTransition(async () => {
       const browser = getMetaBrowserContext();
       const purchaseEventId = generateMetaEventId('Purchase');
-      trackMetaBrowserEvent('Purchase', buildMetaCustomData(
-        orderItems.map((i) => ({ productId: i.productId, price: i.price, quantity: i.quantity })),
-        total
-      ), purchaseEventId);
+      trackMetaBrowserEvent(
+        'Purchase',
+        buildMetaCustomData(
+          orderItems.map((i) => ({ productId: i.productId, price: i.price, quantity: i.quantity })),
+          total
+        ),
+        purchaseEventId,
+        {
+          email: checkoutForm.email.trim() || undefined,
+          phone: checkoutForm.phone,
+        }
+      );
 
       const res = await placeStoreOrder(
-        { ...checkoutForm, notes: combinedNotes },
+        {
+          name: checkoutForm.name,
+          phone: checkoutForm.phone,
+          email: checkoutForm.email.trim() || undefined,
+          address: checkoutForm.address,
+          notes: combinedNotes,
+        },
         orderItems,
         total,
         { eventId: purchaseEventId, browser }
@@ -429,7 +444,7 @@ export default function StorefrontPage() {
         setOrderSuccess(res.order);
         saveCartToLocalStorage([]); // clear cart
         setShowCheckout(false);
-        setCheckoutForm({ name: '', phone: '', address: '', notes: '', deliveryZone: '' });
+        setCheckoutForm({ name: '', phone: '', email: '', address: '', notes: '', deliveryZone: '' });
         showToast('অর্ডার কনফার্ম হয়েছে!', 'success');
       } else {
         showToast(res.error || 'Failed to place order', 'error');
@@ -1376,6 +1391,20 @@ export default function StorefrontPage() {
                       onChange={(e) => setCheckoutForm({ ...checkoutForm, phone: e.target.value })}
                       className="w-full text-stone-800 bg-stone-50 border border-stone-200 text-sm px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-[var(--kf-primary)]/20 focus:border-[var(--kf-primary)] transition"
                     />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] uppercase font-bold tracking-widest text-[var(--kf-text)] mb-1">
+                      {t.checkoutEmailLabel}
+                    </label>
+                    <input
+                      type="email"
+                      placeholder={t.checkoutEmailPlaceholder}
+                      value={checkoutForm.email}
+                      onChange={(e) => setCheckoutForm({ ...checkoutForm, email: e.target.value })}
+                      className="w-full text-stone-800 bg-stone-50 border border-stone-200 text-sm px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-[var(--kf-primary)]/20 focus:border-[var(--kf-primary)] transition"
+                    />
+                    <p className="text-[10px] text-stone-400 mt-1">{t.checkoutEmailHint}</p>
                   </div>
                 </div>
 

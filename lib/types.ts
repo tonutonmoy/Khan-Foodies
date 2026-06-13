@@ -43,6 +43,7 @@ export interface Order {
   orderNumber: string;
   customerName: string;
   phone: string;
+  email?: string;
   address: string;
   items: OrderItem[];
   amount: number;

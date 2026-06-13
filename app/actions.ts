@@ -98,7 +98,7 @@ function invalidateStoreCache() {
 }
 
 export async function placeStoreOrder(
-  customer: { name: string; phone: string; address: string; notes?: string },
+  customer: { name: string; phone: string; address: string; email?: string; notes?: string },
   items: Array<{ productId: string; name: string; price: number; quantity: number }>,
   amount: number,
   meta?: { eventId?: string; browser?: MetaBrowserContext }
@@ -111,6 +111,7 @@ export async function placeStoreOrder(
     const order = await db.createOrder({
       customerName: customer.name,
       phone: customer.phone,
+      email: customer.email?.trim() || undefined,
       address: customer.address,
       items: items.map((item) => ({
         productId: item.productId,
@@ -131,7 +132,11 @@ export async function placeStoreOrder(
         price: Number(item.price),
         quantity: Number(item.quantity),
       })),
-      { name: customer.name, phone: customer.phone },
+      {
+        name: customer.name,
+        phone: customer.phone,
+        email: customer.email?.trim() || undefined,
+      },
       { eventId: meta?.eventId, browser: meta?.browser }
     );
 

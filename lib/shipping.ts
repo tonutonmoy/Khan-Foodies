@@ -4,9 +4,10 @@ type CartLine = { product: Product; quantity: number };
 
 const FREE_DELIVERY_THRESHOLD = 1500;
 
+/** Free delivery when any cart item has freeShipping (mixed cart still ships free). */
 export function cartQualifiesForFreeShipping(cart: CartLine[]): boolean {
   if (cart.length === 0) return false;
-  return cart.every((item) => Boolean(item.product.freeShipping));
+  return cart.some((item) => Boolean(item.product.freeShipping));
 }
 
 export function computeDeliveryFee(

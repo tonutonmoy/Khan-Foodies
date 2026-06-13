@@ -70,6 +70,7 @@ function mapOrder(o: {
   orderNumber: string;
   customerName: string;
   phone: string;
+  email?: string | null;
   address: string;
   items: OrderItem[];
   amount: number;
@@ -82,6 +83,7 @@ function mapOrder(o: {
     orderNumber: o.orderNumber,
     customerName: o.customerName,
     phone: o.phone,
+    email: o.email ?? undefined,
     address: o.address,
     items: o.items,
     amount: o.amount,
@@ -272,6 +274,7 @@ export const db = {
         orderNumber: orderNum,
         customerName: order.customerName,
         phone: order.phone,
+        email: order.email?.trim() || null,
         address: order.address,
         items: order.items,
         amount: Number(order.amount),
