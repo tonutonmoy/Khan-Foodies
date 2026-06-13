@@ -89,12 +89,23 @@ export const metadata: Metadata = {
     icon: '/khan-foodies-logo.png',
     apple: '/khan-foodies-logo.png',
   },
+  manifest: '/manifest.webmanifest',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'Khan Foodies',
+  },
+  formatDetection: {
+    telephone: true,
+  },
 };
 
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
+  maximumScale: 5,
   themeColor: '#1a234d',
+  viewportFit: 'cover',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

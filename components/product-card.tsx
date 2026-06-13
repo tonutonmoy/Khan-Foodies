@@ -3,6 +3,7 @@
 import Image from 'next/image';
 import { Product } from '@/lib/types';
 import { GlowButton } from '@/components/glow-button';
+import { FreeDeliveryBadge } from '@/components/free-delivery-badge';
 import { t } from '@/lib/i18n-bn';
 
 const ACCENTS = ['#1a234d', '#2a3568', '#f5b075', '#e89a52', '#121833'];
@@ -29,6 +30,7 @@ export function ProductCard({
   const tags: string[] = [];
   if (product.discount > 0) tags.push(`${t.savePercent} ${product.discount}%`);
   if (product.rating >= 4) tags.push(`${product.rating.toFixed(1)} ★`);
+  if (product.freeShipping) tags.push(t.freeDeliveryBadge);
 
   const priceLabel =
     product.discount > 0 ? (
@@ -58,6 +60,11 @@ export function ProductCard({
             referrerPolicy="no-referrer"
             sizes="(max-width: 640px) 50vw, 240px"
           />
+          {product.freeShipping && (
+            <span className="pc-free-delivery">
+              <FreeDeliveryBadge />
+            </span>
+          )}
         </button>
       ) : (
         <div className="pc-thumbnail-stack">
@@ -70,6 +77,11 @@ export function ProductCard({
             referrerPolicy="no-referrer"
             sizes="(max-width: 640px) 50vw, 240px"
           />
+          {product.freeShipping && (
+            <span className="pc-free-delivery">
+              <FreeDeliveryBadge />
+            </span>
+          )}
         </div>
       )}
 
@@ -84,7 +96,10 @@ export function ProductCard({
       {tags.length > 0 && (
         <ul className="pc-tag-list">
           {tags.map((tag) => (
-            <li key={tag} className="pc-tag">
+            <li
+              key={tag}
+              className={`pc-tag${tag === t.freeDeliveryBadge ? ' pc-tag--free' : ''}`}
+            >
               {tag}
             </li>
           ))}

@@ -59,9 +59,11 @@ import {
 } from '@/lib/shipping';
 import { ScrollReveal } from '@/components/scroll-reveal';
 import { ProductCard } from '@/components/product-card';
+import { FreeDeliveryBadge } from '@/components/free-delivery-badge';
 import { Button } from '@/components/button';
 import { FaqSection } from '@/components/faq-section';
 import { Footer } from '@/components/footer';
+import { AppInstallBanner } from '@/components/app-install-banner';
 import { GallerySection } from '@/components/gallery-section';
 import { ReviewSlider } from '@/components/review-slider';
 import { HeroSection } from '@/components/hero-section';
@@ -977,6 +979,8 @@ export default function StorefrontPage() {
       </section>
       </ScrollReveal>
 
+      <AppInstallBanner />
+
       {/* FOOTER */}
       <Footer
         siteContent={siteContent}
@@ -987,7 +991,7 @@ export default function StorefrontPage() {
       {/* QUICK VIEW CUSTOM MODAL */}
       <AnimatePresence>
         {quickViewProduct && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center kf-safe-modal">
             {/* Backdrop */}
             <motion.div
               initial={{ opacity: 0 }}
@@ -1002,7 +1006,7 @@ export default function StorefrontPage() {
               initial={{ scale: 0.95, opacity: 0, y: 30 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.95, opacity: 0, y: 30 }}
-              className="relative w-full max-w-2xl bg-[var(--kf-card-bg)] rounded-3xl overflow-hidden shadow-2xl border border-[var(--kf-border)] grid grid-cols-1 md:grid-cols-2 z-10 max-h-[85vh] sm:max-h-[90vh] overflow-y-auto"
+              className="relative w-full max-w-2xl bg-[var(--kf-card-bg)] rounded-t-3xl sm:rounded-3xl overflow-hidden shadow-2xl border border-[var(--kf-border)] grid grid-cols-1 md:grid-cols-2 z-10 max-h-[92vh] sm:max-h-[90vh] overflow-y-auto"
             >
               <button
                 onClick={() => setQuickViewProduct(null)}
@@ -1021,16 +1025,24 @@ export default function StorefrontPage() {
                   referrerPolicy="no-referrer"
                   sizes="(max-w-sm) 100vw, 400px"
                 />
+                {quickViewProduct.freeShipping && (
+                  <div className="absolute bottom-3 left-3 z-10">
+                    <FreeDeliveryBadge size="md" />
+                  </div>
+                )}
               </div>
 
               {/* Product Info right pane */}
-              <div className="p-6 sm:p-8 flex flex-col justify-between">
+              <div className="p-5 sm:p-8 flex flex-col justify-between">
                 <div>
-                  <span className="text-xs uppercase tracking-widest font-black text-[var(--kf-primary)] bg-[var(--kf-primary-light)] px-2.5 py-1 rounded inline-block mb-3">
-                    {categories.find((c) => c.name === quickViewProduct.category)?.nameBn ||
-                      quickViewProduct.category}
-                  </span>
-                  <h3 className="font-serif text-2xl font-black text-stone-900 leading-tight">
+                  <div className="flex flex-wrap items-center gap-2 mb-3">
+                    <span className="text-xs uppercase tracking-widest font-black text-[var(--kf-primary)] bg-[var(--kf-primary-light)] px-2.5 py-1 rounded inline-block">
+                      {categories.find((c) => c.name === quickViewProduct.category)?.nameBn ||
+                        quickViewProduct.category}
+                    </span>
+                    {quickViewProduct.freeShipping && <FreeDeliveryBadge size="md" />}
+                  </div>
+                  <h3 className="font-serif text-xl sm:text-2xl font-black text-stone-900 leading-tight">
                     {quickViewProduct.nameBn || quickViewProduct.name}
                   </h3>
 
@@ -1046,6 +1058,12 @@ export default function StorefrontPage() {
                   </p>
 
                   <div className="space-y-1.5 text-xs text-stone-500 mb-6 bg-stone-50 p-4 rounded-xl">
+                    {quickViewProduct.freeShipping && (
+                      <p className="flex items-center gap-1.5 text-emerald-700 font-bold mb-1">
+                        <Package className="w-3.5 h-3.5 shrink-0" aria-hidden />
+                        {t.freeShippingProduct}
+                      </p>
+                    )}
                     <p className="flex items-center gap-1">
                       <span className="font-bold text-stone-700">{t.purityStatus}:</span> {t.purityValue}
                     </p>
@@ -1056,7 +1074,7 @@ export default function StorefrontPage() {
                 </div>
 
                 {/* Addition action */}
-                <div className="pt-4 border-t border-stone-100 flex items-center justify-between">
+                <div className="pt-4 border-t border-stone-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                   <div>
                     {quickViewProduct.discount > 0 ? (
                       <>
@@ -1078,6 +1096,7 @@ export default function StorefrontPage() {
 
                   <Button
                     size="sm"
+                    className="w-full sm:w-auto shrink-0"
                     onClick={() => {
                       addToCart(quickViewProduct, 1);
                       setQuickViewProduct(null);
@@ -1113,7 +1132,7 @@ export default function StorefrontPage() {
                 animate={{ x: 0 }}
                 exit={{ x: '100%' }}
                 transition={{ type: 'spring', damping: 25, stiffness: 220 }}
-                className="w-screen max-w-md bg-[var(--kf-card-bg)] shadow-2xl flex flex-col justify-between"
+                className="w-screen max-w-md bg-[var(--kf-card-bg)] shadow-2xl flex flex-col justify-between kf-safe-top kf-safe-bottom"
               >
                 {/* Header block */}
                 <div className="p-6 border-b border-stone-100 flex items-center justify-between">
@@ -1289,7 +1308,7 @@ export default function StorefrontPage() {
       {/* CHECKOUT DRAWERS / MODALS */}
       <AnimatePresence>
         {showCheckout && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center kf-safe-modal">
             {/* Backdrop */}
             <motion.div
               initial={{ opacity: 0 }}
@@ -1304,7 +1323,7 @@ export default function StorefrontPage() {
               initial={{ scale: 0.95, opacity: 0, y: 30 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.95, opacity: 0, y: 30 }}
-              className="relative w-full max-w-lg bg-[var(--kf-card-bg)] rounded-3xl shadow-2xl border border-[var(--kf-border)] z-10 p-6 sm:p-8 flex flex-col justify-between max-h-[85vh] sm:max-h-[90vh] overflow-y-auto"
+              className="relative w-full max-w-lg bg-[var(--kf-card-bg)] rounded-t-3xl sm:rounded-3xl shadow-2xl border border-[var(--kf-border)] z-10 p-5 sm:p-8 flex flex-col justify-between max-h-[92vh] sm:max-h-[90vh] overflow-y-auto"
             >
               <button
                 onClick={() => setShowCheckout(false)}

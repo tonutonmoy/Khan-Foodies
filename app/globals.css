@@ -556,3 +556,25 @@ body {
   }
 }
 
+/* Mobile safe-area (notch / home indicator) */
+.kf-safe-top {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+.kf-safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.kf-safe-modal {
+  padding: max(0.75rem, env(safe-area-inset-top, 0px)) max(0.75rem, env(safe-area-inset-right, 0px))
+    max(0.75rem, env(safe-area-inset-bottom, 0px)) max(0.75rem, env(safe-area-inset-left, 0px));
+}
+
+@media (max-width: 640px) {
+  .kf-safe-modal {
+    padding-bottom: 0;
+    padding-left: 0;
+    padding-right: 0;
+  }
+}
+

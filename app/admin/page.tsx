@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useTransition } from 'react';
+import React, { useState, useEffect, useTransition, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   LayoutDashboard,
@@ -30,6 +30,7 @@ import {
   CircleHelp,
   MessageSquare,
   Truck,
+  Menu,
 } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -66,7 +67,14 @@ import {
   ShippingCharge,
 } from '@/lib/types';
 import { AdminOrderNotification } from '@/components/admin-order-notification';
+import { ImageUploadField } from '@/components/image-upload-field';
 import { compressImageForUpload } from '@/lib/compress-image';
+import {
+  ADMIN_TAB_TITLES,
+  adminScrollKey,
+  isAdminTab,
+  type AdminTab,
+} from '@/lib/admin-tabs';
 
 export default function AdminDashboardPage() {
   const [password, setPassword] = useState('');
@@ -83,18 +91,9 @@ export default function AdminDashboardPage() {
   } | null>(null);
 
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<
-    | 'overview'
-    | 'products'
-    | 'categories'
-    | 'orders'
-    | 'content'
-    | 'reviews'
-    | 'gallery'
-    | 'faq'
-    | 'shipping'
-    | 'messages'
-  >('overview');
+  const [activeTab, setActiveTab] = useState<AdminTab>('overview');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const mainRef = useRef<HTMLElement>(null);
   
   // Transition support
   const [isPending, startTransition] = useTransition();
@@ -163,6 +162,79 @@ export default function AdminDashboardPage() {
     }
   };
 
+  const selectTab = useCallback((tab: AdminTab) => {
+    setActiveTab(tab);
+    setSidebarOpen(false);
+    if (typeof window !== 'undefined') {
+      window.history.replaceState(null, '', `#${tab}`);
+      sessionStorage.setItem('khanfoods_admin_tab', tab);
+    }
+  }, []);
+
+  // Restore tab from URL hash or session on load
+  useEffect(() => {
+    const hash = window.location.hash.slice(1);
+    if (isAdminTab(hash)) {
+      setActiveTab(hash);
+      return;
+    }
+    const saved = sessionStorage.getItem('khanfoods_admin_tab');
+    if (saved && isAdminTab(saved)) {
+      setActiveTab(saved);
+      window.history.replaceState(null, '', `#${saved}`);
+    }
+  }, []);
+
+  useEffect(() => {
+    const onHashChange = () => {
+      const hash = window.location.hash.slice(1);
+      if (isAdminTab(hash)) setActiveTab(hash);
+    };
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
+  }, []);
+
+  // Persist scroll position per tab
+  useEffect(() => {
+    const el = mainRef.current;
+    if (!el) return;
+    let timeout: ReturnType<typeof setTimeout>;
+    const onScroll = () => {
+      clearTimeout(timeout);
+      timeout = setTimeout(() => {
+        sessionStorage.setItem(adminScrollKey(activeTab), String(el.scrollTop));
+      }, 120);
+    };
+    el.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      el.removeEventListener('scroll', onScroll);
+      clearTimeout(timeout);
+    };
+  }, [activeTab]);
+
+  // Restore scroll after reload / tab switch
+  useEffect(() => {
+    if (!isLoggedIn || !adminData) return;
+    const el = mainRef.current;
+    if (!el) return;
+    const saved = sessionStorage.getItem(adminScrollKey(activeTab));
+    const scrollTo = saved ? Number.parseInt(saved, 10) : 0;
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        el.scrollTop = Number.isFinite(scrollTo) ? scrollTo : 0;
+      });
+    });
+  }, [activeTab, isLoggedIn, adminData]);
+
+  useEffect(() => {
+    if (!sidebarOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [sidebarOpen]);
+
   // Re-fetch admin data
   const refreshContactMessages = async (pwd: string) => {
     const res = await getContactMessagesAction(pwd);
@@ -187,6 +259,9 @@ export default function AdminDashboardPage() {
       });
       setIsLoggedIn(true);
       localStorage.setItem('khanfoods_admin_key', pwd);
+      if (typeof window !== 'undefined' && !window.location.hash) {
+        window.history.replaceState(null, '', `#${activeTab}`);
+      }
       void refreshContactMessages(pwd);
     } else {
       showToast(res.error || 'Access Denied', 'error');
@@ -634,18 +709,18 @@ export default function AdminDashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] flex flex-col md:flex-row text-stone-900 selection:bg-[#1a234d] selection:text-white">
+    <div className="min-h-[100dvh] h-[100dvh] bg-[#F8FAFC] flex overflow-hidden text-stone-900 selection:bg-[#1a234d] selection:text-white">
       <AdminOrderNotification
         password={password}
         isLoggedIn={isLoggedIn}
-        onViewOrder={() => setActiveTab('orders')}
+        onViewOrder={() => selectTab('orders')}
       />
       {/* Dynamic Toaster */}
-      <div className="fixed top-6 right-6 z-50 flex flex-col gap-2 max-w-sm">
+      <div className="fixed top-4 right-4 left-4 sm:left-auto z-[60] flex flex-col gap-2 max-w-sm sm:max-w-sm ml-auto">
         {toasts.map((t) => (
           <div
             key={t.id}
-            className={`p-4 rounded-xl shadow-2xl text-xs font-black uppercase tracking-wider border-l-4 flex items-center gap-2 ${
+            className={`p-3 sm:p-4 rounded-xl shadow-2xl text-xs font-black uppercase tracking-wider border-l-4 flex items-center gap-2 ${
               t.type === 'success' ? 'bg-emerald-50 border-emerald-500 text-emerald-950' : 'bg-[#fef8f2] border-[#1a234d] text-[#1a234d]'
             }`}
           >
@@ -654,52 +729,78 @@ export default function AdminDashboardPage() {
         ))}
       </div>
 
+      {/* Mobile sidebar backdrop */}
+      <AnimatePresence>
+        {sidebarOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-stone-950/60 backdrop-blur-sm z-40 md:hidden"
+            onClick={() => setSidebarOpen(false)}
+            aria-hidden
+          />
+        )}
+      </AnimatePresence>
+
       {/* ADMIN SIDEBAR NAVIGATION */}
-      <aside className="w-full md:w-64 bg-stone-900 text-stone-100 flex flex-col justify-between shrink-0 border-r border-stone-800 z-10">
-        <div>
-          <div className="p-6 border-b border-stone-800 flex items-center gap-2">
+      <aside
+        className={`fixed md:sticky top-0 left-0 z-50 h-[100dvh] w-72 max-w-[88vw] md:w-64 bg-stone-900 text-stone-100 flex flex-col justify-between shrink-0 border-r border-stone-800 transition-transform duration-300 ease-out ${
+          sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
+        }`}
+      >
+        <div className="flex-1 overflow-y-auto">
+          <div className="p-5 sm:p-6 border-b border-stone-800 flex items-center gap-2 relative">
             <span className="bg-[#1a234d] text-white rounded p-1.5 font-bold text-xs">KF</span>
-            <div>
+            <div className="min-w-0">
               <span className="font-serif font-black text-lg block leading-none text-white">Console</span>
               <span className="text-[9px] uppercase tracking-widest font-extrabold text-[#f5b075]">Khan Foods HQ</span>
             </div>
+            <button
+              type="button"
+              onClick={() => setSidebarOpen(false)}
+              className="md:hidden absolute top-4 right-4 p-2 rounded-lg hover:bg-stone-800 text-stone-300"
+              aria-label="Close menu"
+            >
+              <X className="w-5 h-5" />
+            </button>
           </div>
 
-          <nav className="p-4 space-y-1">
+          <nav className="p-3 sm:p-4 space-y-1">
             <button
-              onClick={() => setActiveTab('overview')}
+              onClick={() => selectTab('overview')}
               className={`w-full flex items-center gap-2.5 px-4 py-3 rounded-lg text-sm font-bold transition text-left cursor-pointer ${
                 activeTab === 'overview' ? 'bg-[#1a234d] text-white' : 'text-stone-400 hover:bg-stone-800 hover:text-white'
               }`}
             >
-              <LayoutDashboard className="w-4 h-4" /> Overview Dashboard
+              <LayoutDashboard className="w-4 h-4 shrink-0" /> Overview Dashboard
             </button>
 
             <button
-              onClick={() => setActiveTab('products')}
+              onClick={() => selectTab('products')}
               className={`w-full flex items-center gap-2.5 px-4 py-3 rounded-lg text-sm font-bold transition text-left cursor-pointer ${
                 activeTab === 'products' ? 'bg-[#1a234d] text-white' : 'text-stone-400 hover:bg-stone-800 hover:text-white'
               }`}
             >
-              <ShoppingBag className="w-4 h-4" /> Manage Products
+              <ShoppingBag className="w-4 h-4 shrink-0" /> Manage Products
             </button>
 
             <button
-              onClick={() => setActiveTab('categories')}
+              onClick={() => selectTab('categories')}
               className={`w-full flex items-center gap-2.5 px-4 py-3 rounded-lg text-sm font-bold transition text-left cursor-pointer ${
                 activeTab === 'categories' ? 'bg-[#1a234d] text-white' : 'text-stone-400 hover:bg-stone-800 hover:text-white'
               }`}
             >
-              <Layers className="w-4 h-4" /> Categories Group
+              <Layers className="w-4 h-4 shrink-0" /> Categories Group
             </button>
 
             <button
-              onClick={() => setActiveTab('orders')}
+              onClick={() => selectTab('orders')}
               className={`w-full flex items-center gap-2.5 px-4 py-3 rounded-lg text-sm font-bold transition text-left cursor-pointer ${
                 activeTab === 'orders' ? 'bg-[#1a234d] text-white' : 'text-stone-400 hover:bg-stone-800 hover:text-white'
               }`}
             >
-              <Package className="w-4 h-4" /> Order Records
+              <Package className="w-4 h-4 shrink-0" /> Order Records
               {adminData && adminData.orders.filter(o => o.status === 'Pending').length > 0 && (
                 <span className="ml-auto bg-amber-500 text-stone-900 text-[10px] font-black px-1.5 py-0.5 rounded-full animate-pulse">
                   {adminData.orders.filter(o => o.status === 'Pending').length}
@@ -708,48 +809,48 @@ export default function AdminDashboardPage() {
             </button>
 
             <button
-              onClick={() => setActiveTab('content')}
+              onClick={() => selectTab('content')}
               className={`w-full flex items-center gap-2.5 px-4 py-3 rounded-lg text-sm font-bold transition text-left cursor-pointer ${
                 activeTab === 'content' ? 'bg-[#1a234d] text-white' : 'text-stone-400 hover:bg-stone-800 hover:text-white'
               }`}
             >
-              <Settings className="w-4 h-4" /> Content Manager
+              <Settings className="w-4 h-4 shrink-0" /> Content Manager
             </button>
 
             <button
-              onClick={() => setActiveTab('gallery')}
+              onClick={() => selectTab('gallery')}
               className={`w-full flex items-center gap-2.5 px-4 py-3 rounded-lg text-sm font-bold transition text-left cursor-pointer ${
                 activeTab === 'gallery' ? 'bg-[#1a234d] text-white' : 'text-stone-400 hover:bg-stone-800 hover:text-white'
               }`}
             >
-              <Images className="w-4 h-4" /> Gallery Manager
+              <Images className="w-4 h-4 shrink-0" /> Gallery Manager
             </button>
 
             <button
-              onClick={() => setActiveTab('faq')}
+              onClick={() => selectTab('faq')}
               className={`w-full flex items-center gap-2.5 px-4 py-3 rounded-lg text-sm font-bold transition text-left cursor-pointer ${
                 activeTab === 'faq' ? 'bg-[#1a234d] text-white' : 'text-stone-400 hover:bg-stone-800 hover:text-white'
               }`}
             >
-              <CircleHelp className="w-4 h-4" /> FAQ Manager
+              <CircleHelp className="w-4 h-4 shrink-0" /> FAQ Manager
             </button>
 
             <button
-              onClick={() => setActiveTab('shipping')}
+              onClick={() => selectTab('shipping')}
               className={`w-full flex items-center gap-2.5 px-4 py-3 rounded-lg text-sm font-bold transition text-left cursor-pointer ${
                 activeTab === 'shipping' ? 'bg-[#1a234d] text-white' : 'text-stone-400 hover:bg-stone-800 hover:text-white'
               }`}
             >
-              <Truck className="w-4 h-4" /> Shipping Charges
+              <Truck className="w-4 h-4 shrink-0" /> Shipping Charges
             </button>
 
             <button
-              onClick={() => setActiveTab('messages')}
+              onClick={() => selectTab('messages')}
               className={`w-full flex items-center gap-2.5 px-4 py-3 rounded-lg text-sm font-bold transition text-left cursor-pointer ${
                 activeTab === 'messages' ? 'bg-[#1a234d] text-white' : 'text-stone-400 hover:bg-stone-800 hover:text-white'
               }`}
             >
-              <MessageSquare className="w-4 h-4" /> Contact Messages
+              <MessageSquare className="w-4 h-4 shrink-0" /> Contact Messages
               {contactMessages.length > 0 && (
                 <span className="ml-auto bg-[#f5b075] text-[#1a234d] text-[10px] font-black px-1.5 py-0.5 rounded-full">
                   {contactMessages.length}
@@ -758,23 +859,23 @@ export default function AdminDashboardPage() {
             </button>
 
             <button
-              onClick={() => setActiveTab('reviews')}
+              onClick={() => selectTab('reviews')}
               className={`w-full flex items-center gap-2.5 px-4 py-3 rounded-lg text-sm font-bold transition text-left cursor-pointer ${
                 activeTab === 'reviews' ? 'bg-[#1a234d] text-white' : 'text-stone-400 hover:bg-stone-800 hover:text-white'
               }`}
             >
-              <Star className="w-4 h-4 text-amber-500 fill-amber-500" /> Review Testimonials
+              <Star className="w-4 h-4 text-amber-500 fill-amber-500 shrink-0" /> Review Testimonials
             </button>
           </nav>
         </div>
 
-        <div className="p-4 border-t border-stone-800 space-y-2">
-          <Link href="/" className="w-full flex items-center justify-center gap-1 bg-stone-800 text-stone-300 hover:text-white py-2 rounded-lg text-xs font-bold transition">
+        <div className="p-3 sm:p-4 border-t border-stone-800 space-y-2 shrink-0">
+          <Link href="/" className="w-full flex items-center justify-center gap-1 bg-stone-800 text-stone-300 hover:text-white py-2.5 rounded-lg text-xs font-bold transition">
             <ArrowLeft className="w-3.5 h-3.5" /> Return to Shop
           </Link>
           <button
             onClick={handleLogout}
-            className="w-full flex items-center justify-center gap-1 bg-[#fef8f2]/10 hover:bg-[#1a234d] hover:text-white text-[#f5b075] py-2 rounded-lg text-xs font-bold transition cursor-pointer"
+            className="w-full flex items-center justify-center gap-1 bg-[#fef8f2]/10 hover:bg-[#1a234d] hover:text-white text-[#f5b075] py-2.5 rounded-lg text-xs font-bold transition cursor-pointer"
           >
             <LogOut className="w-3.5 h-3.5" /> Logout Session
           </button>
@@ -782,24 +883,31 @@ export default function AdminDashboardPage() {
       </aside>
 
       {/* MAIN ADMIN AREA CONTAINER */}
-      <main className="flex-1 p-6 sm:p-10 overflow-y-auto">
+      <div className="flex-1 flex flex-col min-w-0 min-h-0">
+        <header className="md:hidden shrink-0 sticky top-0 z-30 bg-white border-b border-stone-200 px-4 py-3 flex items-center gap-3 shadow-sm">
+          <button
+            type="button"
+            onClick={() => setSidebarOpen(true)}
+            className="p-2 -ml-1 rounded-lg hover:bg-stone-100 text-stone-800"
+            aria-label="Open menu"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
+          <div className="min-w-0 flex-1">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-[#1a234d] block">HQ Console</span>
+            <h2 className="font-serif text-base font-black text-stone-900 truncate">{ADMIN_TAB_TITLES[activeTab]}</h2>
+          </div>
+        </header>
+
+        <main ref={mainRef} className="flex-1 overflow-y-auto overflow-x-hidden p-4 sm:p-6 lg:p-10">
         {/* HQ Header block */}
-        <div className="flex flex-col sm:flex-row items-baseline sm:items-center justify-between gap-4 border-b pb-6 mb-8">
+        <div className="hidden md:flex flex-col sm:flex-row items-baseline sm:items-center justify-between gap-4 border-b pb-6 mb-8">
           <div>
             <span className="text-xs font-bold uppercase tracking-wider text-[#1a234d]">
               HQ Management Command
             </span>
-            <h1 className="font-serif text-3xl font-black text-stone-900">
-              {activeTab === 'overview' && 'Console Overview'}
-              {activeTab === 'products' && 'Product Registry Management'}
-              {activeTab === 'categories' && 'Category Taxonomy Management'}
-              {activeTab === 'orders' && 'Secure Shipping Orders'}
-              {activeTab === 'content' && 'Live Front-page Web Controls'}
-              {activeTab === 'gallery' && 'Gallery Image Manager'}
-              {activeTab === 'faq' && 'FAQ Content Manager'}
-              {activeTab === 'shipping' && 'Shipping Charge Manager'}
-              {activeTab === 'messages' && 'Contact Inbox'}
-              {activeTab === 'reviews' && 'Customer Review Moderation'}
+            <h1 className="font-serif text-2xl lg:text-3xl font-black text-stone-900">
+              {ADMIN_TAB_TITLES[activeTab]}
             </h1>
           </div>
 
@@ -1298,37 +1406,32 @@ export default function AdminDashboardPage() {
                           />
                         </div>
                         {/* Image Banner 1 (URL and Upload) */}
-                        <div>
-                          <label className="block text-[9px] uppercase font-black text-stone-500 mb-1">Banner Image 1</label>
-                          <input
-                            type="text"
-                            placeholder="Image URL"
-                            value={adminData.siteContent.bannerImage1 || ''}
-                            onChange={(e) => setAdminData({ ...adminData, siteContent: { ...adminData.siteContent, bannerImage1: e.target.value }})}
-                            className="w-full text-stone-800 bg-stone-50 border border-stone-200 px-3 py-2 rounded-lg focus:outline-none mb-1 text-[10px]"
-                          />
-                          <div className="relative border border-dashed border-stone-200 bg-stone-50 rounded-lg p-2 text-center hover:bg-stone-100/50 transition cursor-pointer">
-                            <input
-                              type="file" accept="image/*" className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-                              onChange={async (e) => {
-                                const file = e.target.files?.[0];
-                                if (file) {
-                                  await handleImageUpload(file, (url) =>
-                                    setAdminData((prev) =>
-                                      prev
-                                        ? { ...prev, siteContent: { ...prev.siteContent, bannerImage1: url } }
-                                        : prev
-                                    )
-                                  );
-                                }
-                                e.target.value = '';
-                              }}
-                            />
-                            <span className="text-[9px] text-[#1a234d] font-extrabold uppercase tracking-wide">
-                              {uploadingImage ? 'Uploading to ImgBB...' : 'Or upload to ImgBB'}
-                            </span>
-                          </div>
-                        </div>
+                        <ImageUploadField
+                          label="Banner Image 1"
+                          value={adminData.siteContent.bannerImage1 || ''}
+                          onValueChange={(url) =>
+                            setAdminData({
+                              ...adminData,
+                              siteContent: { ...adminData.siteContent, bannerImage1: url },
+                            })
+                          }
+                          onUpload={(file) =>
+                            handleImageUpload(
+                              file,
+                              (url) =>
+                                setAdminData((prev) =>
+                                  prev
+                                    ? { ...prev, siteContent: { ...prev.siteContent, bannerImage1: url } }
+                                    : prev
+                                ),
+                              'banner1'
+                            )
+                          }
+                          uploading={uploadingImage === 'banner1'}
+                          uploadLabel="Upload banner to ImgBB"
+                          compact
+                          previewShape="wide"
+                        />
                       </div>
                     </div>
 
@@ -1385,37 +1488,31 @@ export default function AdminDashboardPage() {
                           />
                         </div>
                         {/* Image Banner 2 */}
-                        <div>
-                          <label className="block text-[9px] uppercase font-black text-stone-500 mb-1">Banner Image 2</label>
-                          <input
-                            type="text"
-                            placeholder="Image URL"
-                            value={adminData.siteContent.bannerImage2 || ''}
-                            onChange={(e) => setAdminData({ ...adminData, siteContent: { ...adminData.siteContent, bannerImage2: e.target.value }})}
-                            className="w-full text-[#111827] bg-stone-50 border border-stone-200 px-3 py-2 rounded-lg focus:outline-none mb-1 text-[10px]"
-                          />
-                          <div className="relative border border-dashed border-stone-200 bg-stone-50 rounded-lg p-2 text-center hover:bg-stone-100/50 transition cursor-pointer">
-                            <input
-                              type="file" accept="image/*" className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-                              onChange={async (e) => {
-                                const file = e.target.files?.[0];
-                                if (file) {
-                                  await handleImageUpload(file, (url) =>
-                                    setAdminData((prev) =>
-                                      prev
-                                        ? { ...prev, siteContent: { ...prev.siteContent, bannerImage2: url } }
-                                        : prev
-                                    )
-                                  );
-                                }
-                                e.target.value = '';
-                              }}
-                            />
-                            <span className="text-[9px] text-[#1a234d] font-extrabold uppercase tracking-wide">
-                              {uploadingImage ? 'Uploading to ImgBB...' : 'Or upload to ImgBB'}
-                            </span>
-                          </div>
-                        </div>
+                        <ImageUploadField
+                          label="Banner Image 2"
+                          value={adminData.siteContent.bannerImage2 || ''}
+                          onValueChange={(url) =>
+                            setAdminData({
+                              ...adminData,
+                              siteContent: { ...adminData.siteContent, bannerImage2: url },
+                            })
+                          }
+                          onUpload={(file) =>
+                            handleImageUpload(
+                              file,
+                              (url) =>
+                                setAdminData((prev) =>
+                                  prev
+                                    ? { ...prev, siteContent: { ...prev.siteContent, bannerImage2: url } }
+                                    : prev
+                                ),
+                              'banner2'
+                            )
+                          }
+                          uploading={uploadingImage === 'banner2'}
+                          compact
+                          previewShape="wide"
+                        />
                       </div>
                     </div>
 
@@ -1472,37 +1569,31 @@ export default function AdminDashboardPage() {
                           />
                         </div>
                         {/* Image Banner 3 */}
-                        <div>
-                          <label className="block text-[9px] uppercase font-black text-stone-500 mb-1">Banner Image 3</label>
-                          <input
-                            type="text"
-                            placeholder="Image URL"
-                            value={adminData.siteContent.bannerImage3 || ''}
-                            onChange={(e) => setAdminData({ ...adminData, siteContent: { ...adminData.siteContent, bannerImage3: e.target.value }})}
-                            className="w-full text-stone-800 bg-stone-50 border border-stone-200 px-3 py-2 rounded-lg focus:outline-none mb-1 text-[10px]"
-                          />
-                          <div className="relative border border-dashed border-stone-200 bg-stone-50 rounded-lg p-2 text-center hover:bg-stone-100/50 transition cursor-pointer">
-                            <input
-                              type="file" accept="image/*" className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-                              onChange={async (e) => {
-                                const file = e.target.files?.[0];
-                                if (file) {
-                                  await handleImageUpload(file, (url) =>
-                                    setAdminData((prev) =>
-                                      prev
-                                        ? { ...prev, siteContent: { ...prev.siteContent, bannerImage3: url } }
-                                        : prev
-                                    )
-                                  );
-                                }
-                                e.target.value = '';
-                              }}
-                            />
-                            <span className="text-[9px] text-[#1a234d] font-extrabold uppercase tracking-wide">
-                              {uploadingImage ? 'Uploading to ImgBB...' : 'Or upload to ImgBB'}
-                            </span>
-                          </div>
-                        </div>
+                        <ImageUploadField
+                          label="Banner Image 3"
+                          value={adminData.siteContent.bannerImage3 || ''}
+                          onValueChange={(url) =>
+                            setAdminData({
+                              ...adminData,
+                              siteContent: { ...adminData.siteContent, bannerImage3: url },
+                            })
+                          }
+                          onUpload={(file) =>
+                            handleImageUpload(
+                              file,
+                              (url) =>
+                                setAdminData((prev) =>
+                                  prev
+                                    ? { ...prev, siteContent: { ...prev.siteContent, bannerImage3: url } }
+                                    : prev
+                                ),
+                              'banner3'
+                            )
+                          }
+                          uploading={uploadingImage === 'banner3'}
+                          compact
+                          previewShape="wide"
+                        />
                       </div>
                     </div>
                   </div>
@@ -1587,56 +1678,31 @@ export default function AdminDashboardPage() {
                       ] as const
                     ).map(([field, label, uploadKey]) => (
                       <div key={field} className="p-4 bg-white rounded-xl border border-stone-200 space-y-2">
-                        <label className="block text-[9px] uppercase font-black text-stone-500">{label}</label>
-                        <input
-                          type="text"
-                          placeholder="Image URL"
+                        <ImageUploadField
+                          label={label}
                           value={adminData.siteContent[field] || ''}
-                          onChange={(e) =>
+                          onValueChange={(url) =>
                             setAdminData({
                               ...adminData,
-                              siteContent: { ...adminData.siteContent, [field]: e.target.value },
+                              siteContent: { ...adminData.siteContent, [field]: url },
                             })
                           }
-                          className="w-full text-stone-800 bg-stone-50 border border-stone-200 px-3 py-2 rounded-lg text-[10px]"
+                          onUpload={(file) =>
+                            handleImageUpload(
+                              file,
+                              (url) =>
+                                setAdminData((prev) =>
+                                  prev
+                                    ? { ...prev, siteContent: { ...prev.siteContent, [field]: url } }
+                                    : prev
+                                ),
+                              uploadKey
+                            )
+                          }
+                          uploading={uploadingImage === uploadKey}
+                          compact
+                          previewShape="wide"
                         />
-                        <div className="relative border border-dashed border-stone-200 bg-stone-50 rounded-lg p-2 text-center cursor-pointer">
-                          <input
-                            type="file"
-                            accept="image/*"
-                            className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-                            onChange={async (e) => {
-                              const file = e.target.files?.[0];
-                              if (file) {
-                                await handleImageUpload(
-                                  file,
-                                  (url) =>
-                                    setAdminData((prev) =>
-                                      prev
-                                        ? { ...prev, siteContent: { ...prev.siteContent, [field]: url } }
-                                        : prev
-                                    ),
-                                  uploadKey
-                                );
-                              }
-                              e.target.value = '';
-                            }}
-                          />
-                          <span className="text-[9px] text-[#1a234d] font-extrabold uppercase">
-                            {uploadingImage === uploadKey ? 'Uploading...' : 'Upload to ImgBB'}
-                          </span>
-                        </div>
-                        {adminData.siteContent[field] && (
-                          <div className="relative w-full h-24 rounded-lg overflow-hidden border border-stone-100">
-                            <Image
-                              src={adminData.siteContent[field]!}
-                              alt={label}
-                              fill
-                              className="object-cover"
-                              referrerPolicy="no-referrer"
-                            />
-                          </div>
-                        )}
                       </div>
                     ))}
                   </div>
@@ -1705,58 +1771,26 @@ export default function AdminDashboardPage() {
 
                     {/* About Section Image URL/Upload Choice */}
                     <div className="md:col-span-2">
-                      <label className="block text-[10px] uppercase font-black text-stone-500 mb-1.5">
-                        About Us Representative Image
-                      </label>
-                      <div className="p-4 bg-white border border-stone-200 rounded-2xl grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-3">
-                          <span className="text-[10px] text-stone-400 font-bold uppercase block">Method 1: Paste Asset URL</span>
-                          <input
-                            type="text"
-                            placeholder="https://images.unsplash.com/about-foods-photo"
-                            value={adminData.siteContent.aboutImage || ''}
-                            onChange={(e) => setAdminData({ ...adminData, siteContent: { ...adminData.siteContent, aboutImage: e.target.value }})}
-                            className="w-full text-stone-800 bg-stone-50 border border-stone-200 px-3 py-2 rounded-lg focus:outline-none text-xs"
-                          />
-                          
-                          <div className="relative border border-dashed border-stone-300 bg-stone-50 rounded-xl p-4 text-center hover:bg-stone-100 transition cursor-pointer">
-                            <input
-                              type="file" accept="image/*" className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-                              onChange={async (e) => {
-                                const file = e.target.files?.[0];
-                                if (file) {
-                                  await handleImageUpload(file, (url) =>
-                                    setAdminData((prev) =>
-                                      prev ? { ...prev, siteContent: { ...prev.siteContent, aboutImage: url } } : prev
-                                    )
-                                  );
-                                }
-                                e.target.value = '';
-                              }}
-                            />
-                            <span className="text-[10px] text-[#1a234d] font-black uppercase block font-sans">
-                              {uploadingImage ? 'Uploading to ImgBB...' : 'Method 2: Upload to ImgBB'}
-                            </span>
-                            <span className="text-[9px] text-stone-400 block mt-0.5">Drag-and-drop or click to upload</span>
-                          </div>
-                        </div>
-
-                        <div className="flex flex-col items-center justify-center p-3 bg-stone-50 border border-stone-100 rounded-xl relative overflow-hidden">
-                          {adminData.siteContent.aboutImage ? (
-                            <div className="relative w-full h-32 rounded-lg overflow-hidden border border-stone-200">
-                              <Image
-                                src={adminData.siteContent.aboutImage}
-                                alt="About preview photo"
-                                fill
-                                className="object-cover"
-                                referrerPolicy="no-referrer"
-                              />
-                            </div>
-                          ) : (
-                            <span className="text-stone-300 text-[10px] italic">No active story image specified</span>
-                          )}
-                        </div>
-                      </div>
+                      <ImageUploadField
+                        label="About Us Representative Image"
+                        value={adminData.siteContent.aboutImage || ''}
+                        onValueChange={(url) =>
+                          setAdminData({
+                            ...adminData,
+                            siteContent: { ...adminData.siteContent, aboutImage: url },
+                          })
+                        }
+                        onUpload={(file) =>
+                          handleImageUpload(file, (url) =>
+                            setAdminData((prev) =>
+                              prev ? { ...prev, siteContent: { ...prev.siteContent, aboutImage: url } } : prev
+                            ),
+                            'about-image'
+                          )
+                        }
+                        uploading={uploadingImage === 'about-image'}
+                        previewShape="banner"
+                      />
                     </div>
                   </div>
                 </div>
@@ -1777,56 +1811,32 @@ export default function AdminDashboardPage() {
                         ['defaultReviewAvatar', 'Default Review Avatar', 'review-avatar'],
                       ] as const
                     ).map(([field, label, uploadKey]) => (
-                      <div key={field} className="space-y-2">
-                        <label className="block text-[10px] uppercase font-black text-stone-500">{label}</label>
-                        <input
-                          type="text"
+                      <div key={field}>
+                        <ImageUploadField
+                          label={label}
                           value={adminData.siteContent[field] || ''}
-                          onChange={(e) =>
+                          onValueChange={(url) =>
                             setAdminData({
                               ...adminData,
-                              siteContent: { ...adminData.siteContent, [field]: e.target.value },
+                              siteContent: { ...adminData.siteContent, [field]: url },
                             })
                           }
-                          className="w-full text-stone-800 bg-white border border-stone-200 px-3 py-2 rounded-lg text-[10px]"
+                          onUpload={(file) =>
+                            handleImageUpload(
+                              file,
+                              (url) =>
+                                setAdminData((prev) =>
+                                  prev
+                                    ? { ...prev, siteContent: { ...prev.siteContent, [field]: url } }
+                                    : prev
+                                ),
+                              uploadKey
+                            )
+                          }
+                          uploading={uploadingImage === uploadKey}
+                          compact
+                          previewShape={field === 'defaultReviewAvatar' ? 'circle' : 'wide'}
                         />
-                        <div className="relative border border-dashed border-stone-200 bg-stone-50 rounded-lg p-2 text-center cursor-pointer">
-                          <input
-                            type="file"
-                            accept="image/*"
-                            className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-                            onChange={async (e) => {
-                              const file = e.target.files?.[0];
-                              if (file) {
-                                await handleImageUpload(
-                                  file,
-                                  (url) =>
-                                    setAdminData((prev) =>
-                                      prev
-                                        ? { ...prev, siteContent: { ...prev.siteContent, [field]: url } }
-                                        : prev
-                                    ),
-                                  uploadKey
-                                );
-                              }
-                              e.target.value = '';
-                            }}
-                          />
-                          <span className="text-[9px] text-[#1a234d] font-extrabold uppercase">
-                            {uploadingImage === uploadKey ? 'Uploading...' : 'Upload to ImgBB'}
-                          </span>
-                        </div>
-                        {adminData.siteContent[field] && (
-                          <div className="relative w-full h-32 rounded-lg overflow-hidden border border-stone-100">
-                            <Image
-                              src={adminData.siteContent[field]!}
-                              alt={label}
-                              fill
-                              className="object-cover"
-                              referrerPolicy="no-referrer"
-                            />
-                          </div>
-                        )}
                       </div>
                     ))}
                   </div>
@@ -2389,11 +2399,12 @@ export default function AdminDashboardPage() {
           </div>
         )}
       </main>
+      </div>
 
       {/* CREATOR DIALOG DICTIONARY: PRODUCT */}
       <AnimatePresence>
         {showProductDialog && editingProduct && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -2406,7 +2417,7 @@ export default function AdminDashboardPage() {
               initial={{ scale: 0.95, opacity: 0, y: 30 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.95, opacity: 0, y: 30 }}
-              className="relative w-full max-w-lg bg-white rounded-3xl p-6 sm:p-8 shadow-2xl z-10 overflow-y-auto max-h-[90vh]"
+              className="relative w-full max-w-lg bg-white rounded-t-3xl sm:rounded-3xl p-5 sm:p-8 shadow-2xl z-10 overflow-y-auto max-h-[92vh] sm:max-h-[90vh]"
             >
               <h3 className="font-serif text-2xl font-black mb-4 text-[#111827]">
                 {editingProduct.id ? 'Edit Product Parameters' : 'Register New Pure Source Asset'}
@@ -2489,71 +2500,20 @@ export default function AdminDashboardPage() {
                   </span>
                 </label>
 
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="block uppercase font-bold tracking-widest text-stone-500 mb-0 leading-none">
-                      Product Display Image
-                    </label>
-                  </div>
-                  
-                  <div className="space-y-2 p-3 bg-stone-50 border border-stone-200 rounded-2xl">
-                    <div>
-                      <span className="text-[10px] text-stone-400 font-extrabold uppercase tracking-wide block mb-1">Option A: Image Web URL</span>
-                      <input
-                        type="url"
-                        placeholder="https://images.unsplash.com/promo-honey-photo"
-                        required
-                        value={editingProduct.image || ''}
-                        onChange={(e) => setEditingProduct({ ...editingProduct, image: e.target.value })}
-                        className="w-full text-stone-800 bg-white border border-stone-200 text-xs px-3 py-2 rounded-lg focus:outline-none font-medium"
-                      />
-                    </div>
-                    
-                    <div className="relative flex items-center justify-center p-4 border border-dashed border-stone-300 bg-white rounded-xl hover:bg-stone-50 transition-colors">
-                      <input
-                        type="file"
-                        accept="image/*"
-                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                        onChange={async (e) => {
-                          const file = e.target.files?.[0];
-                          if (file) {
-                            await handleImageUpload(file, (url) =>
-                              setEditingProduct((prev) => (prev ? { ...prev, image: url } : prev))
-                            );
-                          }
-                          e.target.value = '';
-                        }}
-                      />
-                      <div className="text-center space-y-1">
-                        <Plus className="w-4 h-4 mx-auto text-stone-400" />
-                        <span className="text-[10px] font-black uppercase text-[#1a234d] block">
-                          {uploadingImage ? 'Uploading to ImgBB...' : 'Option B: Upload to ImgBB'}
-                        </span>
-                        <p className="text-[9px] text-stone-400 font-medium">JPEG, PNG or WebP — hosted on ImgBB CDN</p>
-                      </div>
-                    </div>
-
-                    {editingProduct.image && (
-                      <div className="pt-2 flex items-center gap-3">
-                        <div className="relative w-12 h-12 rounded-lg border border-stone-200 bg-white overflow-hidden shrink-0">
-                          <Image
-                            src={editingProduct.image}
-                            alt="Preview Product Asset"
-                            fill
-                            className="object-cover"
-                            referrerPolicy="no-referrer"
-                          />
-                        </div>
-                        <div className="min-w-0 pr-2">
-                          <span className="text-[9px] font-extrabold uppercase text-emerald-600 block font-sans">✓ Selected & Loaded</span>
-                          <span className="text-[9px] text-stone-400 truncate block font-mono">
-                            {editingProduct.image.includes('ibb.co') ? 'ImgBB CDN URL' : editingProduct.image}
-                          </span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
+                <ImageUploadField
+                  label="Product Display Image"
+                  value={editingProduct.image || ''}
+                  onValueChange={(url) => setEditingProduct({ ...editingProduct, image: url })}
+                  onUpload={(file) =>
+                    handleImageUpload(file, (url) =>
+                      setEditingProduct((prev) => (prev ? { ...prev, image: url } : prev)),
+                      'product-image'
+                    )
+                  }
+                  uploading={uploadingImage === 'product-image'}
+                  required
+                  urlPlaceholder="https://images.unsplash.com/promo-honey-photo"
+                />
 
                 <div>
                   <label className="block uppercase font-bold tracking-widest text-stone-500 mb-1 leading-none">
@@ -2607,7 +2567,7 @@ export default function AdminDashboardPage() {
       {/* GALLERY EDIT / CREATE DIALOG */}
       <AnimatePresence>
         {showGalleryDialog && editingGallery && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -2620,7 +2580,7 @@ export default function AdminDashboardPage() {
               initial={{ scale: 0.95, opacity: 0, y: 30 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.95, opacity: 0, y: 30 }}
-              className="relative w-full max-w-lg bg-white rounded-3xl p-6 sm:p-8 shadow-2xl z-10 overflow-y-auto max-h-[90vh]"
+              className="relative w-full max-w-lg bg-white rounded-t-3xl sm:rounded-3xl p-5 sm:p-8 shadow-2xl z-10 overflow-y-auto max-h-[92vh] sm:max-h-[90vh]"
             >
               <h3 className="font-serif text-2xl font-black mb-4 text-[#111827]">
                 {editingGallery.id ? 'গ্যালারি আইটেম এডিট' : 'নতুন গ্যালারি আইটেম'}
@@ -2702,32 +2662,20 @@ export default function AdminDashboardPage() {
                   </div>
                 </div>
 
-                <div className="space-y-2 p-3 bg-stone-50 border border-stone-200 rounded-2xl">
-                  <label className="block text-[10px] uppercase font-bold tracking-widest text-stone-500">
-                    Image URL
-                  </label>
-                  <input
-                    type="url"
-                    placeholder="https://..."
-                    value={editingGallery.image || ''}
-                    onChange={(e) => setEditingGallery({ ...editingGallery, image: e.target.value })}
-                    className="w-full text-stone-800 bg-white border border-stone-200 text-xs px-3 py-2 rounded-lg"
-                  />
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) handleImageUpload(file, (url) => setEditingGallery({ ...editingGallery, image: url }));
-                    }}
-                    className="text-xs w-full"
-                  />
-                  {editingGallery.image && (
-                    <div className="relative w-full h-36 rounded-xl overflow-hidden border">
-                      <Image src={editingGallery.image} alt="" fill className="object-cover" referrerPolicy="no-referrer" />
-                    </div>
-                  )}
-                </div>
+                <ImageUploadField
+                  label="Gallery Image"
+                  value={editingGallery.image || ''}
+                  onValueChange={(url) => setEditingGallery({ ...editingGallery, image: url })}
+                  onUpload={(file) =>
+                    handleImageUpload(
+                      file,
+                      (url) => setEditingGallery({ ...editingGallery, image: url }),
+                      'gallery-edit'
+                    )
+                  }
+                  uploading={uploadingImage === 'gallery-edit'}
+                  previewShape="banner"
+                />
 
                 <div className="flex gap-2 pt-2">
                   <button
@@ -2755,7 +2703,7 @@ export default function AdminDashboardPage() {
       {/* SHIPPING EDIT / CREATE DIALOG */}
       <AnimatePresence>
         {showShippingDialog && editingShipping && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -2857,7 +2805,7 @@ export default function AdminDashboardPage() {
       {/* REVIEW EDIT / CREATE DIALOG */}
       <AnimatePresence>
         {showReviewDialog && editingReview && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -2870,7 +2818,7 @@ export default function AdminDashboardPage() {
               initial={{ scale: 0.95, opacity: 0, y: 30 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.95, opacity: 0, y: 30 }}
-              className="relative w-full max-w-lg bg-white rounded-3xl p-6 sm:p-8 shadow-2xl z-10 overflow-y-auto max-h-[90vh]"
+              className="relative w-full max-w-lg bg-white rounded-t-3xl sm:rounded-3xl p-5 sm:p-8 shadow-2xl z-10 overflow-y-auto max-h-[92vh] sm:max-h-[90vh]"
             >
               <h3 className="font-serif text-2xl font-black mb-4 text-[#111827]">
                 {editingReview.id ? 'রিভিউ এডিট' : 'নতুন রিভিউ যোগ করুন'}
@@ -2938,35 +2886,20 @@ export default function AdminDashboardPage() {
                   </div>
                 </div>
 
-                <div className="space-y-2 p-3 bg-stone-50 border border-stone-200 rounded-2xl">
-                  <label className="block text-[10px] uppercase font-bold tracking-widest text-stone-500">
-                    প্রোফাইল ছবি
-                  </label>
-                  <input
-                    type="url"
-                    placeholder="https://..."
-                    value={editingReview.image || ''}
-                    onChange={(e) => setEditingReview({ ...editingReview, image: e.target.value })}
-                    className="w-full text-stone-800 bg-white border border-stone-200 text-xs px-3 py-2 rounded-lg"
-                  />
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) {
-                        handleImageUpload(file, (url) => setEditingReview({ ...editingReview, image: url }), 'review-edit');
-                      }
-                      e.target.value = '';
-                    }}
-                    className="text-xs w-full"
-                  />
-                  {editingReview.image && (
-                    <div className="relative w-16 h-16 rounded-full overflow-hidden border mx-auto">
-                      <Image src={editingReview.image} alt="" fill className="object-cover" referrerPolicy="no-referrer" />
-                    </div>
-                  )}
-                </div>
+                <ImageUploadField
+                  label="প্রোফাইল ছবি"
+                  value={editingReview.image || ''}
+                  onValueChange={(url) => setEditingReview({ ...editingReview, image: url })}
+                  onUpload={(file) =>
+                    handleImageUpload(
+                      file,
+                      (url) => setEditingReview({ ...editingReview, image: url }),
+                      'review-edit'
+                    )
+                  }
+                  uploading={uploadingImage === 'review-edit'}
+                  previewShape="circle"
+                />
 
                 <div className="flex gap-2 pt-2">
                   <button
@@ -2994,7 +2927,7 @@ export default function AdminDashboardPage() {
       {/* CREATOR DIALOG DICTIONARY: CATEGORY */}
       <AnimatePresence>
         {showCategoryDialog && editingCategory && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}

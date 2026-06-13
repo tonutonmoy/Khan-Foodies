@@ -101,6 +101,7 @@ export function Footer({ siteContent, categories, onCategorySelect }: FooterProp
             <div className="col-span-2 md:col-span-1">
               <h3 className="font-medium text-sm mb-4 text-[var(--kf-peach)]">{t.footerSupport}</h3>
               <ul className="space-y-3 text-sm text-white/75">
+                <li><a href="#app-download" className="hover:text-[var(--kf-peach)] transition">{t.appInstallTitle}</a></li>
                 <li><a href="#about" className="hover:text-[var(--kf-peach)] transition">{t.aboutBadge}</a></li>
                 <li><a href="#faq" className="hover:text-[var(--kf-peach)] transition">{t.faqTitle}</a></li>
                 <li className="flex items-center gap-2 flex-wrap">
