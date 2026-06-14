@@ -1300,13 +1300,20 @@ export default function StorefrontPage() {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-2 pt-2">
-                      <Button variant="outline" size="md" fullWidth onClick={() => setShowCart(false)}>
+                    <div className="flex flex-col gap-2.5 pt-2 md:grid md:grid-cols-2 md:gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        fullWidth
+                        className="py-3 text-sm md:py-2 md:text-xs"
+                        onClick={() => setShowCart(false)}
+                      >
                         {t.keepShopping}
                       </Button>
                       <Button
-                        size="md"
+                        size="sm"
                         fullWidth
+                        className="py-3 text-sm md:py-2 md:text-xs"
                         onClick={openCheckout}
                       >
                         {t.checkout}
