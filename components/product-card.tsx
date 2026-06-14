@@ -58,7 +58,7 @@ export function ProductCard({
             height={240}
             className="pc-thumbnail-img"
             referrerPolicy="no-referrer"
-            sizes="(max-width: 640px) 50vw, 240px"
+            sizes="(max-width: 640px) 92vw, 240px"
           />
           {product.freeShipping && (
             <span className="pc-free-delivery">
@@ -75,7 +75,7 @@ export function ProductCard({
             height={240}
             className="pc-thumbnail-img pointer-events-none"
             referrerPolicy="no-referrer"
-            sizes="(max-width: 640px) 50vw, 240px"
+            sizes="(max-width: 640px) 92vw, 240px"
           />
           {product.freeShipping && (
             <span className="pc-free-delivery">
