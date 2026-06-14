@@ -44,7 +44,7 @@ export function FaqSection({ items, imageDesktop, imageMobile }: FaqSectionProps
 
   return (
     <section id="faq" className="py-16 md:py-20 kf-section-card border-t">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-20">
+      <div className="kf-container px-2 sm:px-4 lg:px-8">
         <h2 className="font-serif font-bold text-3xl lg:text-4xl kf-heading leading-tight">
           {t.faqTitle}
         </h2>

@@ -1689,12 +1689,12 @@ export default function AdminDashboardPage() {
                   </div>
                 </div>
 
-                {/* 2B. HERO SECTION — 4 GRID IMAGES */}
+                {/* 2B. HERO SECTION — SLIDER IMAGES */}
                 <div className="p-6 bg-stone-50 rounded-2xl border border-stone-100 space-y-6">
                   <div>
-                    <h4 className="font-serif text-lg font-bold text-stone-900">2B. Hero Section — 4 Grid Images</h4>
+                    <h4 className="font-serif text-lg font-bold text-stone-900">2B. Hero Section — Auto Slider Images</h4>
                     <p className="text-[10px] text-stone-400 font-bold uppercase tracking-widest">
-                      Right-side 2×2 image grid on the home page hero (প্রিমিয়াম হিরো সেকশন)
+                      হিরো সেকশনের ডান পাশে স্লাইডার — প্রতি ৫ সেকেন্ডে পরিবর্তন (Hero Image 1–4)
                     </p>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">

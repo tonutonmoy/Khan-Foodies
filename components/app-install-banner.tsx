@@ -67,7 +67,7 @@ export function AppInstallBanner() {
   return (
     <section
       id="app-download"
-      className="mx-4 sm:mx-6 max-w-7xl lg:mx-auto mb-8 scroll-mt-24"
+      className="kf-container mb-8 scroll-mt-24"
       aria-label={t.appInstallTitle}
     >
       <div className="relative overflow-hidden rounded-2xl border border-[var(--kf-border)] bg-gradient-to-r from-[var(--kf-navy)] to-[#243066] text-white shadow-xl">

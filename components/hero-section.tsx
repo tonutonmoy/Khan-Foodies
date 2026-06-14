@@ -1,17 +1,21 @@
 'use client';
 
+import { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
 import { ArrowRight } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 import { GlowLink } from '@/components/glow-button';
 import { HeroInteractiveBg } from '@/components/hero-interactive-bg';
 import { t } from '@/lib/i18n-bn';
 
 const FALLBACK_IMAGES = [
-  'https://images.unsplash.com/photo-1553279768-865429fa0078?auto=format&fit=crop&w=735&q=80',
-  'https://images.unsplash.com/photo-1587049352846-4a222e784d38?auto=format&fit=crop&w=687&q=80',
-  'https://images.unsplash.com/photo-1595981267035-7b04ec82a897?auto=format&fit=crop&w=687&q=80',
-  'https://images.unsplash.com/photo-1591073113125-e46713c829ed?auto=format&fit=crop&w=687&q=80',
+  'https://images.unsplash.com/photo-1553279768-865429fa0078?auto=format&fit=crop&w=900&q=80',
+  'https://images.unsplash.com/photo-1587049352846-4a222e784d38?auto=format&fit=crop&w=900&q=80',
+  'https://images.unsplash.com/photo-1595981267035-7b04ec82a897?auto=format&fit=crop&w=900&q=80',
+  'https://images.unsplash.com/photo-1591073113125-e46713c829ed?auto=format&fit=crop&w=900&q=80',
 ];
+
+const SLIDE_INTERVAL_MS = 5000;
 
 interface HeroSectionProps {
   headline?: string;
@@ -19,13 +23,96 @@ interface HeroSectionProps {
   images?: string[];
 }
 
+function HeroImageSlider({ slides }: { slides: string[] }) {
+  const [index, setIndex] = useState(0);
+  const [paused, setPaused] = useState(false);
+
+  const goTo = useCallback(
+    (next: number) => {
+      if (slides.length === 0) return;
+      setIndex(((next % slides.length) + slides.length) % slides.length);
+    },
+    [slides.length]
+  );
+
+  useEffect(() => {
+    if (slides.length <= 1 || paused) return;
+
+    const prefersReduced =
+      typeof window !== 'undefined' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (prefersReduced) return;
+
+    const id = window.setInterval(() => {
+      setIndex((i) => (i + 1) % slides.length);
+    }, SLIDE_INTERVAL_MS);
+
+    return () => window.clearInterval(id);
+  }, [slides.length, paused]);
+
+  if (slides.length === 0) return null;
+
+  return (
+    <div
+      className="relative w-full max-w-[280px] sm:max-w-xs md:max-w-sm aspect-[4/5] rounded-2xl overflow-hidden shadow-2xl ring-2 ring-white/25 shrink-0 mx-auto md:mx-0"
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
+      onFocus={() => setPaused(true)}
+      onBlur={() => setPaused(false)}
+      aria-roledescription="carousel"
+      aria-label="Hero product gallery"
+    >
+      <AnimatePresence mode="wait" initial={false}>
+        <motion.div
+          key={slides[index]}
+          initial={{ opacity: 0, scale: 1.03 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.98 }}
+          transition={{ duration: 0.55, ease: 'easeInOut' }}
+          className="absolute inset-0"
+        >
+          <Image
+            src={slides[index]}
+            alt=""
+            fill
+            className="object-cover"
+            referrerPolicy="no-referrer"
+            priority={index === 0}
+            sizes="(max-width: 768px) 280px, 384px"
+          />
+        </motion.div>
+      </AnimatePresence>
+
+      <div className="absolute inset-0 bg-gradient-to-t from-[#1a234d]/35 via-transparent to-transparent pointer-events-none" />
+
+      {slides.length > 1 && (
+        <div className="absolute bottom-3 left-0 right-0 flex justify-center gap-1.5 z-10">
+          {slides.map((_, i) => (
+            <button
+              key={i}
+              type="button"
+              onClick={() => goTo(i)}
+              aria-label={`Slide ${i + 1}`}
+              aria-current={i === index ? 'true' : undefined}
+              className={`h-1.5 rounded-full transition-all ${
+                i === index ? 'w-6 bg-[var(--kf-peach)]' : 'w-1.5 bg-white/50 hover:bg-white/80'
+              }`}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function HeroSection({ headline, subheadline, images = [] }: HeroSectionProps) {
-  const heroImages = [...images, ...FALLBACK_IMAGES].slice(0, 4);
+  const uploaded = images.filter((url): url is string => Boolean(url?.trim()));
+  const heroSlides = uploaded.length > 0 ? uploaded : FALLBACK_IMAGES;
 
   return (
     <section className="hero-section font-[family-name:var(--font-poppins)]">
       <HeroInteractiveBg />
-      <main className="relative z-10 flex flex-col md:flex-row items-center max-md:text-center justify-between pt-8 pb-16 md:pt-12 px-6 sm:px-10 md:px-16 lg:px-24 max-w-7xl mx-auto w-full gap-10">
+      <main className="relative z-10 kf-container flex flex-col md:flex-row items-center max-md:text-center justify-between pt-8 pb-16 md:pt-12 px-2 sm:px-4 gap-10">
         <div className="flex flex-col items-center md:items-start max-w-xl">
           <a
             href="#products"
@@ -77,24 +164,7 @@ export function HeroSection({ headline, subheadline, images = [] }: HeroSectionP
           </div>
         </div>
 
-        <div
-          aria-label="Khan Foods products"
-          className="grid grid-cols-2 gap-4 sm:gap-6 pb-2 shrink-0"
-        >
-          {heroImages.map((src, i) => (
-            <Image
-              key={`${src}-${i}`}
-              src={src}
-              alt=""
-              width={144}
-              height={176}
-              className="w-28 h-36 sm:w-36 sm:h-44 rounded-lg hover:scale-105 transition duration-300 object-cover shadow-lg ring-2 ring-white/20"
-              referrerPolicy="no-referrer"
-              priority={i < 2}
-              sizes="144px"
-            />
-          ))}
-        </div>
+        <HeroImageSlider slides={heroSlides} />
       </main>
     </section>
   );

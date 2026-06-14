@@ -36,7 +36,7 @@ export function AboutSection({ siteContent, reviews }: AboutSectionProps) {
       id="about"
       className="font-[family-name:var(--font-poppins)] py-16 md:py-24 kf-section-muted border-y"
     >
-      <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-center gap-10 md:gap-14 px-4 sm:px-6 lg:px-8">
+      <div className="kf-container flex flex-col md:flex-row items-center justify-center gap-10 md:gap-14 px-2 sm:px-4">
         <div className="relative shadow-2xl shadow-[color-mix(in_srgb,var(--kf-navy)_25%,transparent)] rounded-2xl overflow-hidden shrink-0 w-full max-w-md">
           <Image
             src={aboutImage}

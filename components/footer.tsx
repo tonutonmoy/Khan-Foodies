@@ -28,7 +28,7 @@ export function Footer({ siteContent, categories, onCategorySelect }: FooterProp
   return (
     <div className="font-[family-name:var(--font-geist)] bg-[var(--kf-footer-outer)] pt-16 sm:pt-20 px-4">
       <footer className="bg-[var(--kf-surface)] w-full max-w-[1350px] mx-auto text-white pt-8 lg:pt-12 px-4 sm:px-8 md:px-16 lg:px-28 rounded-tl-3xl rounded-tr-3xl overflow-hidden pb-4 border border-[var(--kf-surface-border)]">
-        <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-6 gap-8 md:gap-12">
+        <div className="kf-container grid grid-cols-1 lg:grid-cols-6 gap-8 md:gap-12">
           <div className="lg:col-span-3 space-y-6">
             <Link href="/" className="inline-block">
               <Logo height={56} className="rounded-xl" />
@@ -121,7 +121,7 @@ export function Footer({ siteContent, categories, onCategorySelect }: FooterProp
           </div>
         </div>
 
-        <div className="max-w-7xl mx-auto mt-12 pt-4 border-t border-white/10 flex flex-col sm:flex-row justify-between items-center gap-2">
+        <div className="kf-container mt-12 pt-4 border-t border-white/10 flex flex-col sm:flex-row justify-between items-center gap-2">
           <p className="text-white/50 text-sm text-center sm:text-left">
             {siteContent?.footerTextBn || siteContent?.footerText || '© ২০২৬ Khan Foodies।'}
           </p>

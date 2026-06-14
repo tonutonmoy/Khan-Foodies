@@ -53,7 +53,7 @@ export function GallerySection({ items }: GallerySectionProps) {
 
   return (
     <section id="gallery" className="py-16 md:py-20 kf-section-muted border-t">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-10 text-center">
+      <div className="kf-container px-2 sm:px-4 mb-10 text-center">
         <span className="kf-badge mb-3">
           {t.galleryBadge}
         </span>

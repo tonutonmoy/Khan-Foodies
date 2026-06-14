@@ -40,8 +40,8 @@ export function Navbar({ cartCount, onCartOpen, searchQuery, onSearchChange }: N
   const closeMobile = () => setMobileOpen(false);
 
   return (
-    <header className="sticky top-0 z-40 px-4 sm:px-6 py-3">
-      <nav className="kf-surface-nav relative flex items-center border mx-auto max-w-7xl max-md:w-full max-md:justify-between backdrop-blur-md px-3 sm:px-5 py-2 sm:py-3 rounded-2xl sm:rounded-full text-sm">
+    <header className="sticky top-0 z-40 py-3">
+      <nav className="kf-surface-nav relative flex items-center border mx-auto kf-container max-md:justify-between backdrop-blur-md px-3 sm:px-5 py-2 sm:py-3 rounded-2xl sm:rounded-full text-sm">
         <Link href="/" className="shrink-0 flex items-center" onClick={closeMobile}>
           <Logo height={40} priority className="rounded-lg" />
         </Link>

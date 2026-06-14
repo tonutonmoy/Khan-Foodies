@@ -579,7 +579,7 @@ export default function StorefrontPage() {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: "-100px" }}
           transition={{ duration: 0.6, ease: "easeOut" }}
-          className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8"
+          className="kf-container px-2 sm:px-4"
         >
           <div className="text-center max-w-xl mx-auto mb-16">
             <span className="kf-badge mb-3">
@@ -638,7 +638,7 @@ export default function StorefrontPage() {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: "-100px" }}
           transition={{ duration: 0.6, ease: "easeOut" }}
-          className="max-w-7xl mx-auto px-6 sm:px-10"
+          className="kf-container px-2 sm:px-4"
         >
           {/* Section Header */}
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12 border-b border-slate-100 pb-8">
@@ -736,7 +736,7 @@ export default function StorefrontPage() {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: "-100px" }}
           transition={{ duration: 0.6, ease: "easeOut" }}
-          className="max-w-7xl mx-auto px-6 sm:px-10"
+          className="kf-container px-2 sm:px-4"
         >
           <div className="text-center mb-10">
             <span className="kf-badge mb-3">
@@ -880,7 +880,7 @@ export default function StorefrontPage() {
       <ScrollReveal>
       <section id="contact" className="py-20 kf-section-card relative overflow-hidden">
 
-        <div className="max-w-7xl mx-auto px-6 sm:px-10 relative z-10">
+        <div className="kf-container px-2 sm:px-4 relative z-10">
           <div className="max-w-4xl mx-auto rounded-none overflow-hidden border border-[var(--kf-border)] shadow-2xl bg-[var(--kf-card-bg)] grid grid-cols-1 md:grid-cols-5">
             {/* Left coordinates banner */}
             <div className="md:col-span-2 kf-contact-gradient-soft kf-contact-panel p-8 lg:p-12 flex flex-col justify-between relative overflow-hidden">
